@@ -1,4 +1,4 @@
-# omni-gateway
+# omnillm
 
 A production-grade Rust library for provider-neutral LLM access with multi-key load balancing, per-key rate limiting, protocol conversion, circuit breaking, and lock-free cost tracking.
 
@@ -53,7 +53,7 @@ Provider support is exposed through `embedded_provider_registry()`. The registry
 ## Quick Start
 
 ```rust
-use omni_gateway::{
+use omnillm::{
     GenerationConfig, GatewayBuilder, KeyConfig, LlmRequest, Message, MessageRole,
     ProviderEndpoint, RequestItem,
 };
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Protocol Transcoding
 
 ```rust
-use omni_gateway::{transcode_request, ProviderProtocol};
+use omnillm::{transcode_request, ProviderProtocol};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
@@ -107,7 +107,7 @@ let raw_responses = transcode_request(
 Typed multi-endpoint transcoding keeps bridge metadata:
 
 ```rust
-use omni_gateway::{transcode_api_request, WireFormat};
+use omnillm::{transcode_api_request, WireFormat};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
@@ -131,7 +131,7 @@ If you bridge from the canonical Responses model to a narrower protocol, `loss_r
 ## Multi-Endpoint API
 
 ```rust
-use omni_gateway::{
+use omnillm::{
     emit_transport_request, ApiRequest, EmbeddingInput, EmbeddingRequest, RequestBody, WireFormat,
 };
 
@@ -168,7 +168,7 @@ cargo run --example multi_endpoint_demo
 - large binary/base64 payload fields
 
 ```rust
-use omni_gateway::{sanitize_transport_request, HttpMethod, RequestBody, TransportRequest};
+use omnillm::{sanitize_transport_request, HttpMethod, RequestBody, TransportRequest};
 use serde_json::json;
 
 let request = TransportRequest {
@@ -207,7 +207,7 @@ The live demo and live tests read all endpoint configuration from environment va
 
 ```rust
 use std::time::Duration;
-use omni_gateway::{GatewayBuilder, KeyConfig, PoolConfig, ProviderEndpoint};
+use omnillm::{GatewayBuilder, KeyConfig, PoolConfig, ProviderEndpoint};
 
 let gateway = GatewayBuilder::new(ProviderEndpoint::claude_messages())
     .add_key(KeyConfig::new("sk-key-1", "claude-prod-1"))

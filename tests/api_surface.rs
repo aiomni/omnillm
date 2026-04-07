@@ -1,4 +1,4 @@
-use omni_gateway::{
+use omnillm::{
     embedded_provider_registry, emit_transport_request, sanitize_transport_request, ApiRequest,
     BuiltinTool, CapabilitySet, EmbeddingInput, EmbeddingRequest, GenerationConfig, LlmRequest,
     Message, MessageRole, ReasoningCapability, ReplayFixture, RequestBody, RequestItem,
@@ -34,12 +34,12 @@ fn public_registry_exposes_supported_formats() {
     let registry = embedded_provider_registry();
 
     assert!(registry.supports_wire_format(
-        omni_gateway::ProviderKind::OpenAi,
+        omnillm::ProviderKind::OpenAi,
         WireFormat::OpenAiResponses
     ));
     assert!(!registry.supports_endpoint(
-        omni_gateway::ProviderKind::Bedrock,
-        omni_gateway::EndpointKind::Messages
+        omnillm::ProviderKind::Bedrock,
+        omnillm::EndpointKind::Messages
     ));
 }
 
@@ -49,7 +49,7 @@ fn public_replay_sanitizer_redacts_authorization_and_query_tokens() {
     headers.insert("Authorization".into(), "Bearer secret".into());
 
     let request = TransportRequest {
-        method: omni_gateway::HttpMethod::Post,
+        method: omnillm::HttpMethod::Post,
         path: "/responses?ak=secret".into(),
         headers,
         accept: None,
@@ -90,9 +90,9 @@ fn public_generation_transcode_reports_loss_for_downgrade() {
         vendor_extensions: Default::default(),
     });
 
-    let raw = omni_gateway::emit_api_request(WireFormat::OpenAiResponses, &request)
+    let raw = omnillm::emit_api_request(WireFormat::OpenAiResponses, &request)
         .expect("emit responses request");
-    let downgraded = omni_gateway::transcode_api_request(
+    let downgraded = omnillm::transcode_api_request(
         WireFormat::OpenAiResponses,
         WireFormat::OpenAiChatCompletions,
         &raw.value,
@@ -112,7 +112,7 @@ fn public_replay_fixture_sanitizes_binary_responses() {
     let fixture = ReplayFixture {
         wire_format: WireFormat::OpenAiAudioSpeech,
         request: TransportRequest {
-            method: omni_gateway::HttpMethod::Post,
+            method: omnillm::HttpMethod::Post,
             path: "/audio/speech".into(),
             headers: Default::default(),
             accept: Some("audio/mpeg".into()),

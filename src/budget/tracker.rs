@@ -16,7 +16,7 @@ pub type MicroDollar = u64;
 /// # Example
 ///
 /// ```
-/// use omni_gateway::BudgetTracker;
+/// use omnillm::BudgetTracker;
 ///
 /// let tracker = BudgetTracker::new(50.0);
 /// assert!(tracker.try_reserve(1_000_000)); // reserve $1.00

@@ -1,4 +1,4 @@
-//! Error types for the omni-gateway crate.
+//! Error types for the omnillm crate.
 
 use std::collections::BTreeMap;
 use std::time::Duration;

@@ -28,7 +28,7 @@
 ## Module Layout
 
 ```
-omni-gateway/
+omnillm/
 ├── key/
 │   ├── pool.rs       # KeyPool — per-model pool, acquire, error reporting, circuit breaker
 │   ├── lease.rs      # KeyLease — RAII quota lease

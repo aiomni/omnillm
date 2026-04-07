@@ -1,4 +1,4 @@
-//! # omni-gateway
+//! # omnillm
 //!
 //! A production-grade Rust library for provider-neutral LLM access with
 //! multi-key load balancing, protocol conversion, per-key rate limiting, and
@@ -7,7 +7,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use omni_gateway::{
+//! use omnillm::{
 //!     GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest, Message, MessageRole,
 //!     ProviderEndpoint, RequestItem,
 //! };

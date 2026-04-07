@@ -1,4 +1,4 @@
-# Omni Gateway
+# OmniLLM
 
 > Incorporates all review feedback: randomized key selection, per-key parking_lot Mutex,
 > lazy cooldown evaluation, and zero zombie tasks.
@@ -12,7 +12,7 @@
 ## Project Structure
 
 ```
-omni-gateway/
+omnillm/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs            # top-level re-exports and types
@@ -38,7 +38,7 @@ omni-gateway/
 
 ```toml
 [package]
-name    = "omni-gateway"
+name    = "omnillm"
 version = "0.1.0"
 edition = "2021"
 

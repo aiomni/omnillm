@@ -1,6 +1,6 @@
-# omni-gateway Usage Guide
+# omnillm Usage Guide
 
-This guide explains how to use `omni-gateway` as:
+This guide explains how to use `omnillm` as:
 
 - a runtime gateway for generation requests
 - a protocol transcoding layer between supported generation APIs
@@ -11,7 +11,7 @@ If you want architecture and implementation details, see [architecture.md](./arc
 
 ## What This Crate Does
 
-`omni-gateway` has two major surfaces:
+`omnillm` has two major surfaces:
 
 1. `Gateway`
    Use this when you want to send generation requests at runtime with:
@@ -38,7 +38,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-omni-gateway = "0.1"
+omnillm = "0.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-util = "0.7"
 ```
@@ -52,12 +52,12 @@ Examples:
 
 ```toml
 [dependencies]
-omni-gateway = "0.1"
+omnillm = "0.1"
 ```
 
 ```toml
 [dependencies]
-omni-gateway = { version = "0.1", default-features = false, features = ["native-tls"] }
+omnillm = { version = "0.1", default-features = false, features = ["native-tls"] }
 ```
 
 ## Core Concepts
@@ -82,7 +82,7 @@ For multi-endpoint work:
 This is the smallest useful runtime setup:
 
 ```rust
-use omni_gateway::{
+use omnillm::{
     GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest, Message, MessageRole,
     ProviderEndpoint, RequestItem,
 };
@@ -125,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```rust
 use std::time::Duration;
 
-use omni_gateway::{GatewayBuilder, KeyConfig, PoolConfig, ProviderEndpoint};
+use omnillm::{GatewayBuilder, KeyConfig, PoolConfig, ProviderEndpoint};
 
 let gateway = GatewayBuilder::new(ProviderEndpoint::claude_messages())
     .add_key(
@@ -181,7 +181,7 @@ Built-in generation endpoints:
 You can also construct a custom endpoint:
 
 ```rust
-use omni_gateway::{AuthScheme, ProviderEndpoint, ProviderProtocol};
+use omnillm::{AuthScheme, ProviderEndpoint, ProviderProtocol};
 
 let endpoint = ProviderEndpoint::new(
     ProviderProtocol::OpenAiResponses,
@@ -244,7 +244,7 @@ These are normalized controls. When transcoding to narrower protocols, some fiel
 ### Custom Tools
 
 ```rust
-use omni_gateway::{CapabilitySet, ToolDefinition};
+use omnillm::{CapabilitySet, ToolDefinition};
 use serde_json::json;
 
 let capabilities = CapabilitySet {
@@ -268,7 +268,7 @@ let capabilities = CapabilitySet {
 ### Structured Output
 
 ```rust
-use omni_gateway::{CapabilitySet, StructuredOutputConfig};
+use omnillm::{CapabilitySet, StructuredOutputConfig};
 use serde_json::json;
 
 let capabilities = CapabilitySet {
@@ -331,7 +331,7 @@ Use `Gateway::stream` when you want canonical stream events:
 
 ```rust
 use futures_util::StreamExt;
-use omni_gateway::LlmStreamEvent;
+use omnillm::LlmStreamEvent;
 
 let mut stream = gateway.stream(request, CancellationToken::new()).await?;
 
@@ -493,7 +493,7 @@ Use these helpers when you want to work directly with supported generation proto
 Example:
 
 ```rust
-use omni_gateway::{transcode_request, ProviderProtocol};
+use omnillm::{transcode_request, ProviderProtocol};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
@@ -524,7 +524,7 @@ The multi-endpoint API layer is typed and canonical. It is useful when you want 
 ### Emitting a Transport Request
 
 ```rust
-use omni_gateway::{
+use omnillm::{
     emit_transport_request, ApiRequest, EmbeddingInput, EmbeddingRequest, RequestBody, WireFormat,
 };
 
@@ -561,7 +561,7 @@ if let RequestBody::Json { value } = report.value.body {
 Example:
 
 ```rust
-use omni_gateway::{transcode_api_request, WireFormat};
+use omnillm::{transcode_api_request, WireFormat};
 
 let raw = r#"{
   "model": "gpt-4.1-mini",
@@ -586,7 +586,7 @@ for reason in &report.loss_reasons {
 Use the embedded registry to inspect which providers and endpoint families are currently modeled:
 
 ```rust
-use omni_gateway::{embedded_provider_registry, EndpointKind, ProviderKind, WireFormat};
+use omnillm::{embedded_provider_registry, EndpointKind, ProviderKind, WireFormat};
 
 let registry = embedded_provider_registry();
 
@@ -618,7 +618,7 @@ These helpers redact common secrets such as:
 Example:
 
 ```rust
-use omni_gateway::{sanitize_transport_request, HttpMethod, RequestBody, TransportRequest};
+use omnillm::{sanitize_transport_request, HttpMethod, RequestBody, TransportRequest};
 use serde_json::json;
 
 let request = TransportRequest {

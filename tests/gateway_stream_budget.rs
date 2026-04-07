@@ -2,7 +2,7 @@ use std::io;
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use omni_gateway::{
+use omnillm::{
     emit_stream_event, AuthScheme, GatewayBuilder, GatewayError, GenerationConfig, KeyConfig,
     LlmRequest, LlmStreamEvent, Message, MessageRole, ProviderEndpoint, ProviderProtocol,
     ProviderStreamFrame, RequestItem,
@@ -191,7 +191,7 @@ fn test_request() -> LlmRequest {
     }
 }
 
-fn test_gateway(protocol: ProviderProtocol, base_url: String) -> omni_gateway::Gateway {
+fn test_gateway(protocol: ProviderProtocol, base_url: String) -> omnillm::Gateway {
     GatewayBuilder::new(
         ProviderEndpoint::new(protocol, base_url).with_auth(AuthScheme::Header {
             name: "x-test-key".into(),

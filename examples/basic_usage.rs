@@ -1,4 +1,4 @@
-//! Demonstrates basic canonical-hybrid usage of the omni-gateway crate.
+//! Demonstrates basic canonical-hybrid usage of the omnillm crate.
 //!
 //! Run with:
 //! ```sh
@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use omni_gateway::{
+use omnillm::{
     GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest, Message, MessageRole,
     ProviderEndpoint, RequestItem,
 };

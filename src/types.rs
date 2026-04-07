@@ -18,7 +18,7 @@ pub type VendorExtensions = BTreeMap<String, Value>;
 /// # Example
 ///
 /// ```
-/// use omni_gateway::{
+/// use omnillm::{
 ///     GenerationConfig, LlmRequest, Message, MessagePart, MessageRole, RequestItem,
 /// };
 ///

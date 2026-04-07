@@ -1,4 +1,4 @@
-use omni_gateway::{
+use omnillm::{
     emit_api_request, emit_transport_request, parse_error, parse_request, parse_response,
     parse_stream_event, transcode_error, transcode_request, transcode_response,
     transcode_stream_event, ApiRequest, BuiltinTool, CapabilitySet, GenerationConfig, LlmRequest,
@@ -291,7 +291,7 @@ fn degrading_canonical_request() -> ApiRequest {
         instructions: Some("Be terse".into()),
         input: vec![RequestItem::from(Message {
             role: MessageRole::User,
-            parts: vec![omni_gateway::MessagePart::Text {
+            parts: vec![omnillm::MessagePart::Text {
                 text: "Hello!".into(),
             }],
             raw_message: Some(r#"{"role":"user","content":"Hello!"}"#.into()),
@@ -375,7 +375,7 @@ fn assert_core_request_shape(request: &LlmRequest) {
     assert!((temperature - 0.2).abs() < f32::EPSILON);
 }
 
-fn assert_core_response_shape(protocol: ProviderProtocol, response: &omni_gateway::LlmResponse) {
+fn assert_core_response_shape(protocol: ProviderProtocol, response: &omnillm::LlmResponse) {
     assert_eq!(response.provider_protocol, protocol);
     assert_eq!(response.model, "test-model");
     assert_eq!(response.content_text, "Hello back!");
@@ -389,7 +389,7 @@ fn assert_core_response_shape(protocol: ProviderProtocol, response: &omni_gatewa
             && message.plain_text() == "Hello back!"));
 }
 
-fn assert_text_delta(event: omni_gateway::LlmStreamEvent) {
+fn assert_text_delta(event: omnillm::LlmStreamEvent) {
     match event {
         LlmStreamEvent::TextDelta { delta } => assert_eq!(delta, "Hel"),
         other => panic!("expected text delta event, got {other:?}"),

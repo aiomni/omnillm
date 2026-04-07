@@ -5,7 +5,7 @@
 //! cargo run --example multi_endpoint_demo
 //! ```
 
-use omni_gateway::{
+use omnillm::{
     embedded_provider_registry, emit_transport_request, sanitize_transport_request, ApiRequest,
     EmbeddingInput, EmbeddingRequest, ReplayFixture, RequestBody, ResponseBody, TransportRequest,
     TransportResponse, WireFormat,
@@ -15,11 +15,11 @@ use serde_json::json;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry = embedded_provider_registry();
     let openai = registry
-        .provider(omni_gateway::ProviderKind::OpenAi)
+        .provider(omnillm::ProviderKind::OpenAi)
         .expect("openai provider should exist");
     println!(
         "OpenAI supports embeddings: {}",
-        openai.supports_endpoint(omni_gateway::EndpointKind::Embeddings)
+        openai.supports_endpoint(omnillm::EndpointKind::Embeddings)
     );
 
     let raw_chat = json!({
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "max_tokens": 32
     })
     .to_string();
-    let transcoded = omni_gateway::transcode_api_request(
+    let transcoded = omnillm::transcode_api_request(
         WireFormat::OpenAiChatCompletions,
         WireFormat::OpenAiResponses,
         &raw_chat,
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = ReplayFixture {
         wire_format: WireFormat::OpenAiResponses,
         request: TransportRequest {
-            method: omni_gateway::HttpMethod::Post,
+            method: omnillm::HttpMethod::Post,
             path: "/responses?ak=secret-ak".into(),
             headers: [("Authorization".into(), "Bearer secret-token".into())]
                 .into_iter()
