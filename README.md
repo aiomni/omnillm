@@ -2,6 +2,12 @@
 
 A production-grade Rust library for provider-neutral LLM access with multi-key load balancing, per-key rate limiting, protocol conversion, circuit breaking, and lock-free cost tracking.
 
+## Documentation
+
+- [Detailed Usage Guide](./docs/usage.md)
+- [Architecture Notes](./docs/architecture.md)
+- [Implementation Notes](./docs/implementation.md)
+
 ## Features
 
 - Canonical `Responses + Capability Layer` hybrid request/response model
