@@ -1,0 +1,31 @@
+[package]
+name        = "omni-gateway"
+version     = "0.1.0"
+edition     = "2021"
+rust-version = "1.75"
+description = "Production-grade LLM API gateway with multi-key load balancing, per-key rate limiting, circuit breaking, and cost tracking"
+license     = "MIT OR Apache-2.0"
+readme      = "README.md"
+keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai"]
+categories  = ["api-bindings", "asynchronous", "network-programming"]
+
+[dependencies]
+tokio        = { version = "1", features = ["rt", "time", "sync", "macros"] }
+tokio-util   = "0.7"
+reqwest      = { version = "0.12", features = ["json", "stream"], default-features = false }
+parking_lot  = "0.12"
+rand         = "0.8"
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+thiserror    = "2"
+futures-util = "0.3"
+async-stream = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+dotenvy = "0.15"
+
+[features]
+default    = ["rustls"]
+rustls     = ["reqwest/rustls-tls"]
+native-tls = ["reqwest/native-tls"]
