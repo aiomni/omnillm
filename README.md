@@ -8,6 +8,21 @@ A production-grade Rust library for provider-neutral LLM access with multi-key l
 - [Architecture Notes](./docs/architecture.md)
 - [Implementation Notes](./docs/implementation.md)
 
+## Website
+
+The documentation site is powered by Rspress with Markdown content from `docs/`
+and a custom theme from `theme/`.
+
+```sh
+npm install
+npm run site:dev
+npm run site:build
+```
+
+The GitHub Actions deployment workflow builds the site on pushes to `main`
+and publishes `doc_build/` to the `gh-pages` branch. In repository settings,
+set GitHub Pages to deploy from the `gh-pages` branch root.
+
 ## Features
 
 - Canonical `Responses + Capability Layer` hybrid request/response model

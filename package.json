@@ -1,0 +1,17 @@
+{
+  "name": "omnillm-site",
+  "private": true,
+  "scripts": {
+    "site:dev": "rspress dev -c rspress.config.ts --host 0.0.0.0",
+    "site:build": "rspress build -c rspress.config.ts",
+    "site:preview": "rspress preview -c rspress.config.ts --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "@rspress/core": "^2.0.8",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^6.0.2"
+  }
+}
