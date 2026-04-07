@@ -1,0 +1,181 @@
+{
+  "providers": [
+    {
+      "kind": "open_ai",
+      "display_name": "OpenAI",
+      "default_base_url": "https://api.openai.com/v1",
+      "endpoints": [
+        {
+          "endpoint": "responses",
+          "level": "native",
+          "wire_formats": ["open_ai_responses"]
+        },
+        {
+          "endpoint": "chat_completions",
+          "level": "native",
+          "wire_formats": ["open_ai_chat_completions"]
+        },
+        {
+          "endpoint": "embeddings",
+          "level": "native",
+          "wire_formats": ["open_ai_embeddings"]
+        },
+        {
+          "endpoint": "image_generations",
+          "level": "native",
+          "wire_formats": ["open_ai_image_generations"]
+        },
+        {
+          "endpoint": "audio_transcriptions",
+          "level": "native",
+          "wire_formats": ["open_ai_audio_transcriptions"]
+        },
+        {
+          "endpoint": "audio_speech",
+          "level": "native",
+          "wire_formats": ["open_ai_audio_speech"]
+        }
+      ]
+    },
+    {
+      "kind": "azure_open_ai",
+      "display_name": "Azure OpenAI",
+      "endpoints": [
+        {
+          "endpoint": "responses",
+          "level": "compatible",
+          "wire_formats": ["open_ai_responses"],
+          "notes": ["Requires deployment-scoped paths and api-version parameters."]
+        },
+        {
+          "endpoint": "chat_completions",
+          "level": "compatible",
+          "wire_formats": ["open_ai_chat_completions"],
+          "notes": ["Requires deployment-scoped paths and api-version parameters."]
+        },
+        {
+          "endpoint": "embeddings",
+          "level": "compatible",
+          "wire_formats": ["open_ai_embeddings"]
+        },
+        {
+          "endpoint": "image_generations",
+          "level": "compatible",
+          "wire_formats": ["open_ai_image_generations"]
+        },
+        {
+          "endpoint": "audio_transcriptions",
+          "level": "compatible",
+          "wire_formats": ["open_ai_audio_transcriptions"]
+        },
+        {
+          "endpoint": "audio_speech",
+          "level": "compatible",
+          "wire_formats": ["open_ai_audio_speech"]
+        }
+      ]
+    },
+    {
+      "kind": "anthropic",
+      "display_name": "Anthropic",
+      "default_base_url": "https://api.anthropic.com/v1",
+      "endpoints": [
+        {
+          "endpoint": "messages",
+          "level": "native",
+          "wire_formats": ["anthropic_messages"]
+        }
+      ]
+    },
+    {
+      "kind": "gemini",
+      "display_name": "Gemini",
+      "default_base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "endpoints": [
+        {
+          "endpoint": "messages",
+          "level": "native",
+          "wire_formats": ["gemini_generate_content"]
+        },
+        {
+          "endpoint": "embeddings",
+          "level": "planned",
+          "notes": ["Canonical embedding adapters are not implemented yet."]
+        }
+      ]
+    },
+    {
+      "kind": "vertex_ai",
+      "display_name": "Vertex AI",
+      "endpoints": [
+        {
+          "endpoint": "messages",
+          "level": "compatible",
+          "wire_formats": ["gemini_generate_content"],
+          "notes": ["Authentication, project, and location wrappers are still provider-specific."]
+        },
+        {
+          "endpoint": "rerank",
+          "level": "planned",
+          "notes": ["A dedicated adapter is still needed."]
+        }
+      ]
+    },
+    {
+      "kind": "bedrock",
+      "display_name": "Bedrock",
+      "endpoints": [
+        {
+          "endpoint": "messages",
+          "level": "planned",
+          "notes": ["Converse and InvokeModel adapters are not implemented yet."]
+        }
+      ]
+    },
+    {
+      "kind": "open_ai_compatible",
+      "display_name": "OpenAI-Compatible",
+      "endpoints": [
+        {
+          "endpoint": "responses",
+          "level": "compatible",
+          "wire_formats": ["open_ai_responses"]
+        },
+        {
+          "endpoint": "chat_completions",
+          "level": "compatible",
+          "wire_formats": ["open_ai_chat_completions"]
+        },
+        {
+          "endpoint": "embeddings",
+          "level": "compatible",
+          "wire_formats": ["open_ai_embeddings"]
+        },
+        {
+          "endpoint": "image_generations",
+          "level": "compatible",
+          "wire_formats": ["open_ai_image_generations"]
+        },
+        {
+          "endpoint": "audio_transcriptions",
+          "level": "compatible",
+          "wire_formats": ["open_ai_audio_transcriptions"]
+        },
+        {
+          "endpoint": "audio_speech",
+          "level": "compatible",
+          "wire_formats": ["open_ai_audio_speech"]
+        },
+        {
+          "endpoint": "rerank",
+          "level": "compatible",
+          "wire_formats": ["open_ai_rerank"],
+          "notes": ["Depends on the upstream exposing an OpenAI-style rerank surface."]
+        }
+      ],
+      "notes": [
+        "Use this registry entry when a custom endpoint follows OpenAI request and response shapes."
+      ]
+    }
+  ]
+}

@@ -5,12 +5,44 @@ A production-grade Rust library for provider-neutral LLM access with multi-key l
 ## Features
 
 - Canonical `Responses + Capability Layer` hybrid request/response model
+- Additive multi-endpoint API layer with canonical request/response types for generation, embeddings, images, audio, and rerank
 - Protocol-aware dispatch for OpenAI Responses, OpenAI Chat Completions, Claude Messages, and Gemini GenerateContent
-- Raw JSON request/response/error/stream transcoders between supported protocols
+- Raw JSON and typed transcoders between supported protocols and endpoint families
 - Message-level `raw_message` preservation for higher-fidelity round trips
+- Embedded provider support registry for OpenAI, Azure OpenAI, Anthropic, Gemini, Vertex AI, Bedrock, and OpenAI-compatible endpoints
+- Replay fixture sanitization helpers for safe record/replay style testing
 - Multi-key load balancing with per-key rate limiting and circuit breaking
 - Lock-free budget tracking with pre-reserve + settle accounting
 - Non-streaming `call` and canonical streaming `stream` APIs
+
+## Canonical Model
+
+Generation stays centered on the existing Response API semantic model:
+
+- `LlmRequest` / `LlmResponse` are still the canonical generation types.
+- `ApiRequest` / `ApiResponse` add separate canonical types for embeddings, image generations, audio transcriptions, audio speech, and rerank.
+- `ConversionReport<T>` makes bridge semantics explicit with `bridged`, `lossy`, and `loss_reasons`.
+
+This keeps generation normalized around "generate one response" while avoiding capability lock-in to any single wire protocol.
+
+## Endpoint Families
+
+Current typed endpoint coverage:
+
+| Endpoint | Canonical type | Implemented wire formats |
+| --- | --- | --- |
+| Generation | `LlmRequest` / `LlmResponse` | `open_ai_responses`, `open_ai_chat_completions`, `anthropic_messages`, `gemini_generate_content` |
+| Embeddings | `EmbeddingRequest` / `EmbeddingResponse` | `open_ai_embeddings` |
+| Image generation | `ImageGenerationRequest` / `ImageGenerationResponse` | `open_ai_image_generations` |
+| Audio transcription | `AudioTranscriptionRequest` / `AudioTranscriptionResponse` | `open_ai_audio_transcriptions` |
+| Audio speech | `AudioSpeechRequest` / `AudioSpeechResponse` | `open_ai_audio_speech` |
+| Rerank | `RerankRequest` / `RerankResponse` | `open_ai_rerank` |
+
+Provider support is exposed through `embedded_provider_registry()`. The registry distinguishes:
+
+- `native`: implemented with provider-native wire format
+- `compatible`: OpenAI-compatible or wrapper-style support
+- `planned`: listed in the matrix but not yet implemented as a codec/runtime adapter
 
 ## Quick Start
 
@@ -66,6 +98,89 @@ let raw_responses = transcode_request(
 )?;
 ```
 
+Typed multi-endpoint transcoding keeps bridge metadata:
+
+```rust
+use omni_gateway::{transcode_api_request, WireFormat};
+
+let raw_chat = r#"{
+  "model": "gpt-4.1-mini",
+  "messages": [{"role": "user", "content": "Hello!"}],
+  "max_tokens": 32
+}"#;
+
+let report = transcode_api_request(
+    WireFormat::OpenAiChatCompletions,
+    WireFormat::OpenAiResponses,
+    raw_chat,
+)?;
+
+assert!(report.bridged);
+assert!(!report.lossy);
+println!("{}", report.value);
+```
+
+If you bridge from the canonical Responses model to a narrower protocol, `loss_reasons` will tell you exactly what was dropped, such as unsupported builtin tools or provider-specific metadata.
+
+## Multi-Endpoint API
+
+```rust
+use omni_gateway::{
+    emit_transport_request, ApiRequest, EmbeddingInput, EmbeddingRequest, RequestBody, WireFormat,
+};
+
+let request = ApiRequest::Embeddings(EmbeddingRequest {
+    model: "text-embedding-3-small".into(),
+    input: vec![EmbeddingInput::Text { text: "hello".into() }],
+    dimensions: Some(256),
+    encoding_format: None,
+    user: None,
+    vendor_extensions: Default::default(),
+});
+
+let transport = emit_transport_request(WireFormat::OpenAiEmbeddings, &request)?;
+assert_eq!(transport.value.path, "/embeddings");
+
+if let RequestBody::Json { value } = transport.value.body {
+    println!("{}", value);
+}
+```
+
+Local demo:
+
+```sh
+cargo run --example multi_endpoint_demo
+```
+
+## Replay Sanitization
+
+`ReplayFixture`, `sanitize_transport_request`, `sanitize_transport_response`, and `sanitize_json_value` are intended for record/replay tests. They redact common secrets by default:
+
+- auth headers
+- query tokens such as `ak`
+- JSON fields such as `api_key`, `token`, `secret`
+- large binary/base64 payload fields
+
+```rust
+use omni_gateway::{sanitize_transport_request, HttpMethod, RequestBody, TransportRequest};
+use serde_json::json;
+
+let request = TransportRequest {
+    method: HttpMethod::Post,
+    path: "/responses?ak=secret".into(),
+    headers: [("Authorization".into(), "Bearer secret".into())]
+        .into_iter()
+        .collect(),
+    accept: None,
+    body: RequestBody::Json {
+        value: json!({ "api_key": "secret", "input": "hello" }),
+    },
+};
+
+let sanitized = sanitize_transport_request(&request);
+assert_eq!(sanitized.path, "/responses?ak=<redacted:ak>");
+```
+
 ## Live Responses Demo
 
 ```sh
@@ -79,6 +194,8 @@ Optional live test:
 cargo test responses_vision_demo -- --ignored --nocapture
 cargo test responses_function_tool_demo -- --ignored --nocapture
 ```
+
+The live demo and live tests read all endpoint configuration from environment variables or a local ignored `.env` file. See `.env.example`.
 
 ## Gateway Builder
 

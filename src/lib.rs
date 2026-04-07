@@ -39,11 +39,15 @@
 //! # }
 //! ```
 
+pub mod api;
+pub mod api_protocol;
 pub mod budget;
 pub mod config;
 pub mod error;
 pub mod key;
 pub mod protocol;
+pub mod provider_registry;
+pub mod replay;
 pub mod types;
 
 pub(crate) mod dispatcher;
@@ -52,6 +56,20 @@ pub(crate) mod pricing;
 
 mod gateway;
 
+pub use api::{
+    ApiRequest, ApiResponse, AudioInput, AudioSegment, AudioSpeechRequest, AudioSpeechResponse,
+    AudioTranscriptionRequest, AudioTranscriptionResponse, ConversionReport, EmbeddingInput,
+    EmbeddingRequest, EmbeddingResponse, EmbeddingUsage, EmbeddingVector, EndpointKind,
+    GeneratedImage, HttpMethod, ImageGenerationRequest, ImageGenerationResponse, MultipartField,
+    MultipartValue, ProviderKind, RequestBody, RerankDocument, RerankRequest, RerankResponse,
+    RerankResult, RerankUsage, ResponseBody, TranscribedWord, TransportRequest, TransportResponse,
+    WireFormat,
+};
+pub use api_protocol::{
+    emit_api_request, emit_api_response, emit_transport_request, parse_api_request,
+    parse_api_response, parse_transport_response, transcode_api_request, transcode_api_response,
+    ApiProtocolError,
+};
 pub use budget::tracker::BudgetTracker;
 pub use config::{GatewayConfig, KeyConfig, PoolConfig};
 pub use error::{GatewayError, ProviderError};
@@ -63,6 +81,12 @@ pub use protocol::{
     parse_response, parse_stream_event, transcode_error, transcode_request, transcode_response,
     transcode_stream_event, AuthScheme, ProtocolError, ProviderEndpoint, ProviderProtocol,
     ProviderStreamFrame,
+};
+pub use provider_registry::{
+    embedded_provider_registry, EndpointSupport, ProviderDescriptor, ProviderRegistry, SupportLevel,
+};
+pub use replay::{
+    sanitize_json_value, sanitize_transport_request, sanitize_transport_response, ReplayFixture,
 };
 pub use types::{
     BuiltinTool, CacheSettings, CapabilitySet, FinishReason, GenerationConfig, LlmRequest,
