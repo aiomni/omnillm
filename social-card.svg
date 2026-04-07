@@ -1,0 +1,34 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="36" fill="#F6F0E5"/>
+  <rect x="42" y="42" width="1116" height="546" rx="30" fill="#111111"/>
+  <path d="M42 160C188 120 302 88 453 74C658 55 842 98 1158 210V588H42V160Z" fill="url(#paint0_linear)"/>
+  <circle cx="1012" cy="176" r="132" fill="url(#paint1_radial)" fill-opacity="0.9"/>
+  <circle cx="212" cy="134" r="104" fill="url(#paint2_radial)" fill-opacity="0.75"/>
+  <rect x="118" y="118" width="132" height="132" rx="34" fill="#111111" stroke="#C8FF45" stroke-width="8"/>
+  <path d="M154 206V159L184 142L214 159V206L184 223L154 206Z" fill="#C8FF45"/>
+  <path d="M184 170L198 178V193L184 201L170 193V178L184 170Z" fill="#111111"/>
+  <text x="118" y="338" fill="#F6F0E5" font-family="'Space Grotesk', Arial, sans-serif" font-size="90" font-weight="700">
+    OmniLLM
+  </text>
+  <text x="118" y="408" fill="#F6F0E5" font-family="'Space Grotesk', Arial, sans-serif" font-size="34" font-weight="500">
+    Provider-neutral Rust runtime for LLM routing and protocol bridging.
+  </text>
+  <text x="118" y="464" fill="#C8FF45" font-family="'IBM Plex Mono', monospace" font-size="24" letter-spacing="4">
+    MULTI-KEY LOAD BALANCING / BUDGET TRACKING / CANONICAL DOCS
+  </text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="596" y1="74" x2="596" y2="588" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C8FF45" stop-opacity="0.16"/>
+      <stop offset="0.45" stop-color="#FF7F50" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#111111" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1012 176) rotate(90) scale(132)">
+      <stop stop-color="#6DD3FF"/>
+      <stop offset="1" stop-color="#6DD3FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="paint2_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(212 134) rotate(90) scale(104)">
+      <stop stop-color="#C8FF45"/>
+      <stop offset="1" stop-color="#C8FF45" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
