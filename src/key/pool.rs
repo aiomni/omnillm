@@ -61,7 +61,7 @@ impl KeyPool {
             if cur + estimated_tokens > key.tpm_limit {
                 continue;
             }
-            match key.tpm_inflight.compare_exchange_weak(
+            match key.tpm_inflight.compare_exchange(
                 cur,
                 cur + estimated_tokens,
                 Ordering::AcqRel,

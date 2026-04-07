@@ -85,6 +85,7 @@ impl Gateway {
         cancel: CancellationToken,
     ) -> Result<GatewayStream, GatewayError> {
         let est_tokens = req.estimated_tokens();
+        let est_prompt_tokens = req.estimated_prompt_tokens();
         let est_cost = pricing::estimate(est_tokens, &req.model);
 
         let lease = self
@@ -123,7 +124,9 @@ impl Gateway {
             let mut inner = inner;
             let mut usage = None;
             let mut content = String::new();
+            let mut generated_chars = 0;
             let mut completed = false;
+            let mut seen_tools = std::collections::HashSet::new();
 
             loop {
                 let next = tokio::select! {
@@ -139,6 +142,16 @@ impl Gateway {
                             LlmStreamEvent::ResponseStarted { .. } => {}
                             LlmStreamEvent::TextDelta { delta } => {
                                 content.push_str(delta);
+                                generated_chars += delta.len();
+                            }
+                            LlmStreamEvent::ToolCallDelta { call_id, name, delta } => {
+                                generated_chars += delta.len();
+                                if seen_tools.insert(call_id.clone()) {
+                                    generated_chars += name.len();
+                                }
+                            }
+                            LlmStreamEvent::ReasoningDelta { delta } => {
+                                generated_chars += delta.len();
                             }
                             LlmStreamEvent::Usage { usage: event_usage } => {
                                 usage = Some(event_usage.clone());
@@ -155,7 +168,18 @@ impl Gateway {
                         yield event;
                     }
                     Some(Err(err)) => {
-                        budget.settle(est_cost, 0);
+                        let partial_tokens = (generated_chars / 4) as u32;
+                        let actual = if let Some(u) = &usage {
+                            pricing::actual(u, &req.model)
+                        } else {
+                            let partial_usage = crate::types::TokenUsage {
+                                prompt_tokens: est_prompt_tokens,
+                                completion_tokens: partial_tokens,
+                                total_tokens: Some(est_prompt_tokens + partial_tokens),
+                            };
+                            pricing::actual(&partial_usage, &req.model)
+                        };
+                        budget.settle(est_cost, actual);
                         if matches!(
                             err,
                             ApiError::Unauthorized | ApiError::RateLimited { .. } | ApiError::Provider(_)
@@ -166,15 +190,20 @@ impl Gateway {
                     }
                     None => {
                         if !completed {
-                            let usage = usage.unwrap_or_default();
-                            let actual = pricing::actual(&usage, &req.model);
+                            let partial_tokens = (generated_chars / 4) as u32;
+                            let final_usage = usage.clone().unwrap_or_else(|| crate::types::TokenUsage {
+                                prompt_tokens: est_prompt_tokens,
+                                completion_tokens: partial_tokens,
+                                total_tokens: Some(est_prompt_tokens + partial_tokens),
+                            });
+                            let actual = pricing::actual(&final_usage, &req.model);
                             budget.settle(est_cost, actual);
                             pool.report_success(&lease);
                             let response = LlmResponse::from_message(
                                 provider_protocol,
                                 model.clone(),
                                 Message::text(MessageRole::Assistant, content.clone()),
-                                usage,
+                                final_usage,
                             );
                             yield LlmStreamEvent::Completed { response };
                         }

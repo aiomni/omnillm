@@ -46,12 +46,14 @@ impl BudgetTracker {
             if cur + estimated > self.limit {
                 return false;
             }
-            if self
-                .used
-                .compare_exchange_weak(cur, cur + estimated, Ordering::AcqRel, Ordering::Relaxed)
-                .is_ok()
-            {
-                return true;
+            match self.used.compare_exchange_weak(
+                cur,
+                cur + estimated,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return true,
+                Err(_) => std::hint::spin_loop(),
             }
         }
     }

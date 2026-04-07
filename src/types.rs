@@ -122,11 +122,8 @@ impl LlmRequest {
         }
     }
 
-    /// Conservative token estimate before sending.
-    ///
-    /// Uses ~4 chars per token as a rough proxy, plus the configured output
-    /// budget. The real count is only available in the provider response.
-    pub fn estimated_tokens(&self) -> u32 {
+    /// Estimate the number of prompt tokens before sending.
+    pub fn estimated_prompt_tokens(&self) -> u32 {
         let mut chars = self
             .normalized_input()
             .iter()
@@ -137,7 +134,14 @@ impl LlmRequest {
             chars += instructions.len();
         }
 
-        (chars / 4).max(1) as u32 + self.generation.max_output_tokens.unwrap_or(1024)
+        (chars / 4).max(1) as u32
+    }
+
+    /// Conservative total token estimate before sending (prompt + max output budget).
+    ///
+    /// The real count is only available in the provider response.
+    pub fn estimated_tokens(&self) -> u32 {
+        self.estimated_prompt_tokens() + self.generation.max_output_tokens.unwrap_or(1024)
     }
 }
 
