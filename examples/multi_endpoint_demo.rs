@@ -6,7 +6,7 @@
 //! ```
 
 use omni_gateway::{
-    emit_transport_request, embedded_provider_registry, sanitize_transport_request, ApiRequest,
+    embedded_provider_registry, emit_transport_request, sanitize_transport_request, ApiRequest,
     EmbeddingInput, EmbeddingRequest, ReplayFixture, RequestBody, ResponseBody, TransportRequest,
     TransportResponse, WireFormat,
 };
@@ -33,7 +33,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         WireFormat::OpenAiResponses,
         &raw_chat,
     )?;
-    println!("chat -> responses bridged={} lossy={}", transcoded.bridged, transcoded.lossy);
+    println!(
+        "chat -> responses bridged={} lossy={}",
+        transcoded.bridged, transcoded.lossy
+    );
     println!("responses payload: {}", transcoded.value);
 
     let embedding_request = ApiRequest::Embeddings(EmbeddingRequest {

@@ -673,6 +673,12 @@ fn sanitize_generation_request(
                         .into(),
                 );
             }
+            if sanitized.capabilities.reasoning.take().is_some() {
+                loss_reasons.push(
+                    "reasoning settings are dropped when bridging to gemini_generate_content"
+                        .into(),
+                );
+            }
             if sanitized.generation.presence_penalty.take().is_some() {
                 loss_reasons.push(
                     "presence_penalty is dropped when bridging to gemini_generate_content".into(),
@@ -710,19 +716,25 @@ fn request_has_vendor_extensions(request: &LlmRequest) -> bool {
         return true;
     }
 
-    if request
-        .messages
-        .iter()
-        .any(|message| message.raw_message.is_some() || !message.vendor_extensions.is_empty())
-    {
+    if request.normalized_input().iter().any(|item| match item {
+        crate::types::RequestItem::Message { message } => {
+            message.raw_message.is_some() || !message.vendor_extensions.is_empty()
+        }
+        crate::types::RequestItem::ToolResult { .. } => false,
+    }) {
         return true;
     }
 
     request
         .capabilities
-        .tools
-        .iter()
-        .any(|tool| !tool.vendor_extensions.is_empty())
+        .reasoning
+        .as_ref()
+        .is_some_and(|reasoning| !reasoning.vendor_extensions.is_empty())
+        || request
+            .capabilities
+            .tools
+            .iter()
+            .any(|tool| !tool.vendor_extensions.is_empty())
 }
 
 fn wire_path(wire_format: WireFormat, model: &str) -> String {
