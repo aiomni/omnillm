@@ -1,4 +1,4 @@
-# omnillm
+# OmniLLM
 
 A production-grade Rust library for provider-neutral LLM access with multi-key load balancing, per-key rate limiting, protocol conversion, circuit breaking, and lock-free cost tracking.
 

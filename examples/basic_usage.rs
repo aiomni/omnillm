@@ -1,4 +1,4 @@
-//! Demonstrates basic canonical-hybrid usage of the omnillm crate.
+//! Demonstrates basic canonical-hybrid usage of the OmniLLM crate.
 //!
 //! Run with:
 //! ```sh

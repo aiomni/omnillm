@@ -1,6 +1,6 @@
-# omnillm Usage Guide
+# OmniLLM Usage Guide
 
-This guide explains how to use `omnillm` as:
+This guide explains how to use OmniLLM as:
 
 - a runtime gateway for generation requests
 - a protocol transcoding layer between supported generation APIs
@@ -11,7 +11,7 @@ If you want architecture and implementation details, see [architecture.md](./arc
 
 ## What This Crate Does
 
-`omnillm` has two major surfaces:
+OmniLLM has two major surfaces:
 
 1. `Gateway`
    Use this when you want to send generation requests at runtime with:

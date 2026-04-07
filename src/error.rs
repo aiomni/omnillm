@@ -1,4 +1,4 @@
-//! Error types for the omnillm crate.
+//! Error types for the OmniLLM crate.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
