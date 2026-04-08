@@ -261,6 +261,54 @@ body .rp-nav {
   box-shadow: 0 0 56px rgba(9, 105, 218, 0.24);
 }
 
+.omn-nav-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.omn-lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem;
+  border: 1px solid var(--omn-ghost);
+  border-radius: 999px;
+  background: rgba(23, 28, 34, 0.88);
+  backdrop-filter: blur(18px);
+}
+
+.omn-lang-switcher__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.4rem;
+  min-height: 2rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: 999px;
+  color: var(--omn-text-muted);
+  text-decoration: none;
+  font-family: var(--rp-font-family-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.omn-lang-switcher__item:hover {
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.omn-lang-switcher__item--active {
+  background: linear-gradient(135deg, var(--omn-blue), var(--omn-blue-deep));
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
 .rp-nav-hamburger {
   width: 2.6rem;
   height: 2.6rem;
@@ -1437,6 +1485,11 @@ body .rp-doc-layout__container {
     padding-inline: 0.8rem;
   }
 
+  .omn-lang-switcher__item {
+    min-width: 3rem;
+    padding-inline: 0.72rem;
+  }
+
   .omn-site-footer__inner {
     flex-direction: column;
   }
@@ -1490,8 +1543,18 @@ body .rp-doc-layout__container {
     height: 0.62rem;
   }
 
+  .omn-nav-controls {
+    gap: 0.45rem;
+  }
+
   .omn-nav-install {
     display: none;
+  }
+
+  .omn-lang-switcher__item {
+    min-width: auto;
+    padding-inline: 0.65rem;
+    letter-spacing: 0.1em;
   }
 
   .omn-home__intro h1 {
@@ -1516,6 +1579,7 @@ body .rp-doc-layout__container {
   .rp-nav-menu__item__container,
   .rp-nav-hamburger,
   .omn-nav-install,
+  .omn-lang-switcher__item,
   .omn-home__action,
   .omn-home__doc-card,
   .rp-prev-next-page__item {

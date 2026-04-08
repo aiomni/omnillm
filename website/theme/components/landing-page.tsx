@@ -1,89 +1,15 @@
-import type { CSSProperties, ReactNode } from "react";
-import { Link } from "@rspress/core/runtime";
+import type { CSSProperties, ReactNode } from 'react';
+import { Link } from '@rspress/core/runtime';
 
-type HeroStat = {
-  label: string;
-  value: string;
-};
-
-type FeatureCard = {
-  eyebrow: string;
-  title: string;
-  copy: string;
-  detail: string;
-  accent: string;
-};
-
-type DocCard = {
-  label: string;
-  title: string;
-  copy: string;
-  href: string;
-};
+import { homeContent } from '../locale-data';
+import { useSiteLocale } from '../use-locale';
 
 type CodeLine = {
   line: string;
   content: ReactNode;
 };
 
-const heroStats: HeroStat[] = [
-  { value: "04", label: "generation protocols" },
-  { value: "07", label: "provider families" },
-  { value: "01", label: "bundled OmniLLM Skill" },
-];
-
-const featureCards: FeatureCard[] = [
-  {
-    eyebrow: "Gateway",
-    title: "Route canonical requests through one runtime surface.",
-    copy: "Gateway dispatch keeps request typing, key pooling, timeouts, and usage accounting in the same execution path.",
-    detail: "responses · chat · streams",
-    accent: "#0969da",
-  },
-  {
-    eyebrow: "Bridge",
-    title: "Transcode across APIs without hiding downgrade behavior.",
-    copy: "Loss reports stay explicit so application logic can branch on bridged or dropped fields instead of guessing.",
-    detail: "typed conversion · loss metadata",
-    accent: "#ffb4a6",
-  },
-  {
-    eyebrow: "Operate",
-    title: "Keep quota, replay, and provider state visible.",
-    copy: "Per-key limits, budget reservation, fixture sanitization, registry metadata, and the bundled OmniLLM Skill all live next to the crate.",
-    detail: "budgets · replay · skill",
-    accent: "#7fe0ff",
-  },
-];
-
-const docCards: DocCard[] = [
-  {
-    label: "Guide",
-    title: "Usage Guide",
-    copy: "Install the crate, configure endpoints, send requests, stream results, and operate the runtime in production-shaped flows.",
-    href: "/usage",
-  },
-  {
-    label: "Skill",
-    title: "Skill Guide",
-    copy: "Install the OmniLLM Skill in Claude Code, Codex, OpenCode, or Claude and keep agents aligned with the crate's real boundaries.",
-    href: "/skill",
-  },
-  {
-    label: "Design",
-    title: "Architecture Notes",
-    copy: "Read the lease lifecycle, key-pool acquisition strategy, and budget tracker model before diving into source.",
-    href: "/architecture",
-  },
-  {
-    label: "Source",
-    title: "Implementation Notes",
-    copy: "Walk the crate module by module when you want concrete execution paths, data structures, and internal boundaries.",
-    href: "/implementation",
-  },
-];
-
-const codeIndent = "    ";
+const codeIndent = '    ';
 const codeChainIndent = `${codeIndent}${codeIndent}`;
 
 const codeLines: CodeLine[] = [
@@ -238,11 +164,12 @@ const codeLines: CodeLine[] = [
 ];
 
 function ActionLink(props: {
-  href: string;
   label: string;
-  tone: "primary" | "secondary";
+  href: string;
+  tone: 'primary' | 'secondary';
 }) {
-  const isExternal = props.href.startsWith("http");
+  const { localizePath } = useSiteLocale();
+  const isExternal = props.href.startsWith('http');
   const className = `omn-home__action omn-home__action--${props.tone}`;
 
   if (isExternal) {
@@ -260,16 +187,16 @@ function ActionLink(props: {
   }
 
   return (
-    <Link className={className} to={props.href}>
+    <Link className={className} to={localizePath(props.href)}>
       <span>{props.label}</span>
       {props.tone === "primary" ? <span aria-hidden="true">→</span> : null}
     </Link>
   );
 }
 
-function FeatureTile(card: FeatureCard) {
+function FeatureTile(card: (typeof homeContent)['en']['featureCards'][number]) {
   const style = {
-    "--omn-feature-accent": card.accent,
+    '--omn-feature-accent': card.accent
   } as CSSProperties;
 
   return (
@@ -282,20 +209,24 @@ function FeatureTile(card: FeatureCard) {
   );
 }
 
-function DocTile(entry: DocCard) {
+function DocTile(entry: (typeof homeContent)['en']['docCards'][number]) {
+  const { localizePath, home } = useSiteLocale();
+
   return (
-    <Link className="omn-home__doc-card" to={entry.href}>
+    <Link className="omn-home__doc-card" to={localizePath(entry.href)}>
       <span className="omn-home__doc-label">{entry.label}</span>
       <h3>{entry.title}</h3>
       <p>{entry.copy}</p>
       <span className="omn-home__doc-link">
-        Read <span aria-hidden="true">→</span>
+        {home.readLabel} <span aria-hidden="true">→</span>
       </span>
     </Link>
   );
 }
 
 export function LandingPage() {
+  const { home } = useSiteLocale();
+
   return (
     <div className="omn-home">
       <section className="omn-home__hero">
@@ -304,48 +235,34 @@ export function LandingPage() {
             <span className="omn-home__badge omn-home__badge--accent">
               v0.1.0
             </span>
-            <span className="omn-home__badge">
-              provider-neutral Rust runtime
-            </span>
-            <span className="omn-home__badge">bundled OmniLLM Skill</span>
+            <span className="omn-home__badge">{home.badgeProviderNeutral}</span>
+            <span className="omn-home__badge">{home.badgeSkill}</span>
           </div>
           <h1>OmniLLM</h1>
-          <p>
-            Type-safe, high-performance LLM routing, protocol bridging, and
-            budget-aware multi-key execution for Rust, with a bundled OmniLLM
-            Skill in the repository.
-          </p>
+          <p>{home.heroCopy}</p>
           <div className="omn-home__actions">
-            <ActionLink href="/usage" label="Get Started" tone="primary" />
-            <ActionLink
-              href="/skill"
-              label="Install Skill"
-              tone="secondary"
-            />
+            <ActionLink href="/usage" label={home.getStartedLabel} tone="primary" />
+            <ActionLink href="/skill" label={home.installSkillLabel} tone="secondary" />
             <ActionLink
               href="https://github.com/aiomni/omnillm"
-              label="Browse Source"
+              label={home.browseSourceLabel}
               tone="secondary"
             />
           </div>
           <div className="omn-home__install">
             <code>$ cargo add omnillm</code>
-            <span>crate install · skill included</span>
+            <span>{home.installHint}</span>
           </div>
         </div>
 
         <aside className="omn-home__hero-side">
           <div className="omn-home__signal">
-            <span className="omn-home__section-kicker">AI-Native Runtime</span>
-            <h2>One runtime crate, plus an OmniLLM Skill.</h2>
-            <p>
-              Canonical request types, loss-aware transcoding, and budget
-              settlement stay in one operational frame, and the repository also
-              includes the OmniLLM Skill for repo-native assistance.
-            </p>
+            <span className="omn-home__section-kicker">{home.heroSignalKicker}</span>
+            <h2>{home.heroSignalTitle}</h2>
+            <p>{home.heroSignalCopy}</p>
           </div>
           <div className="omn-home__metric-grid">
-            {heroStats.map((item) => (
+            {home.heroStats.map(item => (
               <article className="omn-home__metric-card" key={item.label}>
                 <strong>{item.value}</strong>
                 <span>{item.label}</span>
@@ -356,33 +273,20 @@ export function LandingPage() {
       </section>
 
       <section className="omn-home__feature-grid">
-        {featureCards.map((card) => (
+        {home.featureCards.map(card => (
           <FeatureTile key={card.title} {...card} />
         ))}
       </section>
 
       <section className="omn-home__showcase">
         <div className="omn-home__showcase-copy">
-          <span className="omn-home__section-kicker">Source-Adjacent Docs And Skill</span>
-          <h2>Operate the runtime and onboard AI agents from repository context.</h2>
-          <p>
-            Usage notes, architecture rationale, implementation walkthroughs,
-            and the bundled OmniLLM Skill live beside the crate so behavior,
-            design, AI guidance, and source stay aligned.
-          </p>
+          <span className="omn-home__section-kicker">{home.showcaseKicker}</span>
+          <h2>{home.showcaseTitle}</h2>
+          <p>{home.showcaseCopy}</p>
           <ul className="omn-home__bullet-list">
-            <li>
-              Canonical request and response models stay visible in the docs.
-            </li>
-            <li>
-              Key-pool, budget, and replay tooling are documented from the
-              repository state.
-            </li>
-            <li>
-              Implementation notes point directly back to the modules that
-              enforce the behavior.
-            </li>
-            <li>The Skill Guide covers Claude Code, Codex, OpenCode, and Claude installation paths.</li>
+            {home.showcaseBullets.map(item => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </div>
 
@@ -393,10 +297,10 @@ export function LandingPage() {
               <span />
               <span />
             </div>
-            <span>examples/basic_usage.rs</span>
+            <span>{home.codeFileLabel}</span>
           </div>
           <div className="omn-home__code-body">
-            {codeLines.map((line) => (
+            {codeLines.map(line => (
               <div className="omn-home__code-line" key={line.line}>
                 <span className="omn-home__code-number">{line.line}</span>
                 <code>{line.content}</code>
@@ -408,38 +312,25 @@ export function LandingPage() {
 
       <section className="omn-home__docs">
         <div className="omn-home__docs-head">
-          <span className="omn-home__section-kicker">Documentation</span>
-          <h2>Choose the reading depth you need.</h2>
-          <p>
-            Start with operational usage, move into architecture, then read the
-            implementation notes when you want the concrete module boundaries.
-          </p>
+          <span className="omn-home__section-kicker">{home.docsKicker}</span>
+          <h2>{home.docsTitle}</h2>
+          <p>{home.docsDescription}</p>
         </div>
         <div className="omn-home__docs-grid">
-          {docCards.map((entry) => (
+          {home.docCards.map(entry => (
             <DocTile key={entry.title} {...entry} />
           ))}
         </div>
       </section>
 
       <section className="omn-home__bottom-strip">
-        <article>
-          <span className="omn-home__strip-label">Focus</span>
-          <strong>Gateway dispatch</strong>
-          <p>Provider-neutral runtime calls with typed generation surfaces.</p>
-        </article>
-        <article>
-          <span className="omn-home__strip-label">Safety</span>
-          <strong>Loss-aware bridges</strong>
-          <p>
-            Transcoding stays explicit about downgraded or unsupported fields.
-          </p>
-        </article>
-        <article>
-          <span className="omn-home__strip-label">Operations</span>
-          <strong>Budget-first execution</strong>
-          <p>Quota reservation and settlement wrap every request lifecycle.</p>
-        </article>
+        {home.bottomStrip.map(entry => (
+          <article key={entry.title}>
+            <span className="omn-home__strip-label">{entry.label}</span>
+            <strong>{entry.title}</strong>
+            <p>{entry.copy}</p>
+          </article>
+        ))}
       </section>
     </div>
   );

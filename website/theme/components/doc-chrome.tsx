@@ -1,5 +1,8 @@
 import { Link, useFrontmatter, usePage } from '@rspress/core/runtime';
 
+import { getRouteLabel } from '../locale-data';
+import { useSiteLocale } from '../use-locale';
+
 type OmniDocFrontmatter = {
   description?: string;
   label?: string;
@@ -11,22 +14,6 @@ type OmniDocFrontmatter = {
 const DEFAULT_RELEASE = 'v0.1.0';
 const DEFAULT_UPDATED = 'Apr 2026';
 
-function routeLabel(routePath: string) {
-  if (routePath === '/usage') {
-    return 'runtime guide';
-  }
-
-  if (routePath === '/architecture') {
-    return 'system design';
-  }
-
-  if (routePath === '/implementation') {
-    return 'source walkthrough';
-  }
-
-  return 'documentation';
-}
-
 function buildAnchor(id: string) {
   return `#${id}`;
 }
@@ -34,11 +21,10 @@ function buildAnchor(id: string) {
 export function DocIntro() {
   const { page } = usePage();
   const { frontmatter } = useFrontmatter();
+  const { chrome, lang, localizePath, route, sourcePath } = useSiteLocale();
   const meta = frontmatter as OmniDocFrontmatter;
   const sectionLinks = page.toc.filter(item => item.depth === 2).slice(0, 3);
   const summary = meta.summary ?? meta.description ?? page.description ?? '';
-  const relativePath =
-    typeof page._relativePath === 'string' ? page._relativePath : 'website/docs';
 
   return (
     <section className="omn-doc-intro">
@@ -46,19 +32,19 @@ export function DocIntro() {
         <span className="omn-doc-chip omn-doc-chip--accent">
           {meta.release ?? DEFAULT_RELEASE}
         </span>
-        <span className="omn-doc-chip">{meta.label ?? routeLabel(page.routePath)}</span>
+        <span className="omn-doc-chip">{meta.label ?? getRouteLabel(route, lang)}</span>
         <span className="omn-doc-chip">{meta.updated ?? DEFAULT_UPDATED}</span>
       </div>
 
       <div className="omn-doc-intro__grid">
         <article className="omn-doc-intro__card omn-doc-intro__card--primary">
-          <span className="omn-doc-intro__kicker">Repository Source</span>
-          <strong>{relativePath}</strong>
+          <span className="omn-doc-intro__kicker">{chrome.repositorySourceKicker}</span>
+          <strong>{sourcePath}</strong>
           {summary ? <p>{summary}</p> : null}
         </article>
 
         <article className="omn-doc-intro__card">
-          <span className="omn-doc-intro__kicker">Quick Paths</span>
+          <span className="omn-doc-intro__kicker">{chrome.quickPathsKicker}</span>
           <div className="omn-doc-intro__links">
             {sectionLinks.length > 0 ? (
               sectionLinks.map(link => (
@@ -67,7 +53,7 @@ export function DocIntro() {
                 </a>
               ))
             ) : (
-              <Link to="/usage">Open documentation index</Link>
+              <Link to={localizePath('/usage')}>{chrome.openDocIndexLabel}</Link>
             )}
           </div>
         </article>
@@ -77,33 +63,34 @@ export function DocIntro() {
 }
 
 export function DocsSidebarIntro() {
-  const { page } = usePage();
+  const { chrome, lang, localizePath, route } = useSiteLocale();
 
   return (
     <div className="omn-side-panel">
-      <span className="omn-side-panel__kicker">crate install</span>
+      <span className="omn-side-panel__kicker">{chrome.installPanelKicker}</span>
       <code>cargo add omnillm</code>
       <p>
-        {routeLabel(page.routePath)} with source-adjacent notes for runtime
-        behavior, quotas, and provider bridges.
+        {getRouteLabel(route, lang)}{' '}
+        {lang === 'zh'
+          ? '配有贴近源码的运行时行为、配额限制与 provider 桥接说明。'
+          : 'with source-adjacent notes for runtime behavior, quotas, and provider bridges.'}
       </p>
-      <Link to="/usage#installation">Install the crate</Link>
+      <Link to={localizePath('/usage#installation')}>{chrome.installPanelLink}</Link>
     </div>
   );
 }
 
 export function DocsOutlineCta() {
+  const { chrome, localizePath } = useSiteLocale();
+
   return (
     <div className="omn-outline-panel">
-      <span className="omn-outline-panel__kicker">Need internals?</span>
-      <p>
-        Cross-check the behavior with implementation notes or inspect the
-        repository directly.
-      </p>
+      <span className="omn-outline-panel__kicker">{chrome.needInternalsKicker}</span>
+      <p>{chrome.needInternalsText}</p>
       <div className="omn-outline-panel__actions">
-        <Link to="/implementation">Implementation</Link>
+        <Link to={localizePath('/implementation')}>{chrome.needInternalsLink}</Link>
         <a href="https://github.com/aiomni/omnillm" rel="noreferrer" target="_blank">
-          GitHub
+          {chrome.githubLabel}
         </a>
       </div>
     </div>

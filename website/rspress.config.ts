@@ -1,10 +1,19 @@
 import { defineConfig } from '@rspress/core';
 
+import {
+  getNav,
+  getSidebar,
+  localeMetadata,
+  themeLocaleMetadata
+} from './theme/locale-data';
+
 const base = process.env.RSPRESS_BASE ?? '/';
 
 export default defineConfig({
   root: 'docs',
   base,
+  lang: 'en',
+  locales: localeMetadata as unknown as { description: string; lang: string; title: string }[],
   title: 'OmniLLM',
   description:
     'Provider-neutral Rust runtime for LLM routing, protocol transcoding, and budget-aware multi-key execution.',
@@ -12,32 +21,13 @@ export default defineConfig({
   logo: '/omnillm-mark.svg',
   themeConfig: {
     darkMode: false,
-    nav: [
-      { text: 'Overview', link: '/', activeMatch: '^(?:/|/index(?:\\.html)?)$' },
-      { text: 'Usage', link: '/usage' },
-      { text: 'Architecture', link: '/architecture' },
-      { text: 'Implementation', link: '/implementation' },
-      { text: 'GitHub', link: 'https://github.com/aiomni/omnillm' }
-    ],
-    sidebar: {
-      '/': [
-        {
-          text: 'Start Here',
-          items: [
-            { text: 'Overview', link: '/' },
-            { text: 'Usage Guide', link: '/usage' },
-            { text: 'Skill Guide', link: '/skill' }
-          ]
-        },
-        {
-          text: 'Deep Dive',
-          items: [
-            { text: 'Architecture Notes', link: '/architecture' },
-            { text: 'Implementation Notes', link: '/implementation' }
-          ]
-        }
-      ]
-    },
+    nav: getNav('en'),
+    sidebar: getSidebar('en'),
+    locales: themeLocaleMetadata as unknown as Array<{
+      lang: string;
+      nav: ReturnType<typeof getNav>;
+      sidebar: ReturnType<typeof getSidebar>;
+    }>,
     editLink: {
       docRepoBaseUrl: 'https://github.com/aiomni/omnillm/edit/main/website/docs',
       text: 'Edit this page on GitHub'
