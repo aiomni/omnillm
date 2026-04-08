@@ -1,10 +1,10 @@
 ---
 title: Usage Guide
-description: Install OmniLLM, configure provider endpoints, send canonical requests, stream results, and operate the runtime in production-shaped flows.
+description: Install OmniLLM, configure provider endpoints, install the bundled Claude Skill, send canonical requests, stream results, and operate the runtime in production-shaped flows.
 label: runtime guide
 release: v0.1.0
 updated: Apr 2026
-summary: Gateway setup, protocol bridging, budget tracking, replay sanitization, and operational patterns.
+summary: AI-native setup, gateway runtime, protocol bridging, budget tracking, replay sanitization, and operational patterns.
 ---
 
 # Usage Guide
@@ -15,6 +15,7 @@ This guide explains how to use OmniLLM as:
 - a protocol transcoding layer between supported generation APIs
 - a typed multi-endpoint conversion layer for embeddings, images, audio, and rerank
 - a replay sanitization helper for test fixtures
+- an AI-native Rust project that ships a bundled Claude Skill
 
 If you want architecture and implementation details, see [architecture.md](./architecture.md) and [implementation.md](./implementation.md).
 
@@ -68,6 +69,34 @@ omnillm = "0.1"
 [dependencies]
 omnillm = { version = "0.1", default-features = false, features = ["native-tls"] }
 ```
+
+## AI-Native Skill
+
+OmniLLM ships with a bundled Claude Skill in the repository's
+[`skill/` directory](https://github.com/aiomni/omnillm/tree/main/skill). This
+is a first-party, repo-native integration for Claude, so the assistant can load
+OmniLLM-specific guidance for the gateway runtime, protocol conversion,
+multi-endpoint typed APIs, replay sanitization, and common runtime errors.
+
+### Install It
+
+1. Clone or download the repository.
+2. Zip the `skill/` directory.
+3. Upload the zip in Claude.ai → Settings → Capabilities → Skills → Upload.
+
+### Use It
+
+After installation, ask Claude to do things like:
+
+- add `omnillm` to a Rust project and scaffold a `GatewayBuilder` flow
+- configure `ProviderEndpoint`, `KeyConfig`, and local budget controls
+- transcode requests with `transcode_*` or `emit_transport_request`
+- explain why a request is `bridged`, `lossy`, or failing with `Protocol(...)`
+- debug `NoAvailableKey`, `BudgetExceeded`, `RateLimited`, or auth setup
+
+The skill is especially useful when your prompt or code contains OmniLLM-native
+signals such as `GatewayBuilder`, `LlmRequest`, `ApiRequest`, `WireFormat`,
+`ReplayFixture`, or environment variables like `OMNILLM_RESPONSES_*`.
 
 ## Core Concepts
 

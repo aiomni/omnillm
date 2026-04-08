@@ -1,29 +1,52 @@
 # OmniLLM
 
-A production-grade Rust library for provider-neutral LLM access with multi-key load balancing, per-key rate limiting, protocol conversion, circuit breaking, and lock-free cost tracking.
+An AI-native, production-grade Rust library for provider-neutral LLM access with multi-key load balancing, per-key rate limiting, protocol conversion, circuit breaking, and lock-free cost tracking.
 
 ## Documentation
 
-- [Detailed Usage Guide](./website/docs/usage.md)
-- [Architecture Notes](./website/docs/architecture.md)
-- [Implementation Notes](./website/docs/implementation.md)
+- [Detailed Usage Guide](https://github.com/aiomni/omnillm/blob/main/website/docs/usage.md)
+- [Architecture Notes](https://github.com/aiomni/omnillm/blob/main/website/docs/architecture.md)
+- [Implementation Notes](https://github.com/aiomni/omnillm/blob/main/website/docs/implementation.md)
+- [API docs on docs.rs](https://docs.rs/omnillm)
+- [Bundled Claude Skill](./skill)
 
-## Website
+## AI-Native Project
 
-The documentation site lives in `website/`. Its Markdown content is in
-`website/docs/`, the custom theme is in `website/theme/`, and the Rspress
-config and TypeScript setup live alongside them.
+OmniLLM ships with a first-party Claude Skill in [`skill/`](./skill). The
+skill teaches Claude how to work with OmniLLM's actual runtime and conversion
+surfaces instead of guessing from generic Rust or generic SDK patterns.
 
-```sh
-cd website
-npm install
-npm run site:dev
-npm run site:build
-```
+The bundled Skill is tuned for repository-native signals such as:
 
-The GitHub Actions deployment workflow builds the site on pushes to `main`
-and publishes `website/doc_build/` to the `gh-pages` branch. In repository
-settings, set GitHub Pages to deploy from the `gh-pages` branch root.
+- `GatewayBuilder`, `Gateway`, `KeyConfig`, `PoolConfig`
+- `ProviderEndpoint`, `ProviderProtocol`, `LlmRequest`, `LlmStreamEvent`
+- `ApiRequest`, `WireFormat`, `emit_transport_request`, `transcode_*`
+- `ReplayFixture`, `sanitize_transport_request`, `OMNILLM_RESPONSES_*`
+- runtime errors like `NoAvailableKey`, `BudgetExceeded`, and `Protocol(...)`
+
+### Install The Skill
+
+1. Clone or download this repository.
+2. Zip the `skill/` directory.
+3. Upload the zip in Claude.ai → Settings → Capabilities → Skills → Upload.
+
+### Use The Skill
+
+After installing it, ask Claude to:
+
+- integrate `omnillm` into a Rust project
+- configure a multi-key runtime gateway
+- transcode between provider protocols or typed endpoint formats
+- explain replay sanitization and fixture-safe testing
+- debug OmniLLM-specific errors and configuration issues
+
+## Repository Docs Site
+
+The documentation site source lives in the GitHub repository:
+
+- [website/docs](https://github.com/aiomni/omnillm/tree/main/website/docs)
+- [website/theme](https://github.com/aiomni/omnillm/tree/main/website/theme)
+- [GitHub Pages workflow](https://github.com/aiomni/omnillm/blob/main/.github/workflows/gh-pages.yml)
 
 ## Features
 
@@ -37,6 +60,7 @@ settings, set GitHub Pages to deploy from the `gh-pages` branch root.
 - Multi-key load balancing with per-key rate limiting and circuit breaking
 - Lock-free budget tracking with pre-reserve + settle accounting
 - Non-streaming `call` and canonical streaming `stream` APIs
+- Bundled Claude Skill in `skill/` for AI-native repo guidance
 
 ## Canonical Model
 

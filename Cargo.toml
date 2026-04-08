@@ -6,8 +6,21 @@ rust-version = "1.75"
 description = "Production-grade LLM API gateway with multi-key load balancing, per-key rate limiting, circuit breaking, and cost tracking"
 license     = "MIT OR Apache-2.0"
 readme      = "README.md"
+repository  = "https://github.com/aiomni/omnillm"
+homepage    = "https://github.com/aiomni/omnillm"
+documentation = "https://docs.rs/omnillm"
 keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai"]
 categories  = ["api-bindings", "asynchronous", "network-programming"]
+include     = [
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/.env.example",
+  "/src/**",
+  "/examples/**",
+  "/support/provider_support_matrix.json",
+  "/tests/**",
+]
 
 [dependencies]
 tokio        = { version = "1", features = ["rt", "time", "sync", "macros"] }

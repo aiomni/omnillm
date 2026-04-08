@@ -29,7 +29,7 @@ type CodeLine = {
 const heroStats: HeroStat[] = [
   { value: "04", label: "generation protocols" },
   { value: "07", label: "provider families" },
-  { value: "2-pass", label: "budget settlement loop" },
+  { value: "01", label: "bundled Claude Skill" },
 ];
 
 const featureCards: FeatureCard[] = [
@@ -50,8 +50,8 @@ const featureCards: FeatureCard[] = [
   {
     eyebrow: "Operate",
     title: "Keep quota, replay, and provider state visible.",
-    copy: "Per-key limits, budget reservation, fixture sanitization, and registry metadata all live next to the crate.",
-    detail: "budgets · replay · registry",
+    copy: "Per-key limits, budget reservation, fixture sanitization, registry metadata, and the bundled Claude Skill all live next to the crate.",
+    detail: "budgets · replay · skill",
     accent: "#7fe0ff",
   },
 ];
@@ -301,14 +301,21 @@ export function LandingPage() {
             <span className="omn-home__badge">
               provider-neutral Rust runtime
             </span>
+            <span className="omn-home__badge">AI-native · Claude Skill included</span>
           </div>
           <h1>OmniLLM</h1>
           <p>
             Type-safe, high-performance LLM routing, protocol bridging, and
-            budget-aware multi-key execution for Rust.
+            budget-aware multi-key execution for Rust, with a bundled Claude
+            Skill for repo-native AI workflows.
           </p>
           <div className="omn-home__actions">
             <ActionLink href="/usage" label="Get Started" tone="primary" />
+            <ActionLink
+              href="/usage#ai-native-skill"
+              label="Install Skill"
+              tone="secondary"
+            />
             <ActionLink
               href="https://github.com/aiomni/omnillm"
               label="Browse Source"
@@ -317,21 +324,22 @@ export function LandingPage() {
           </div>
           <div className="omn-home__install">
             <code>$ cargo add omnillm</code>
-            <span>crate install</span>
+            <span>crate install · skill included</span>
           </div>
         </div>
 
         <aside className="omn-home__hero-side">
           <div className="omn-home__signal">
-            <span className="omn-home__section-kicker">Runtime Surface</span>
+            <span className="omn-home__section-kicker">AI-Native Runtime</span>
             <h2>
-              One crate for dispatch, bridge, quota control, and replay-safe
-              traces.
+              One crate and one bundled Skill for dispatch, bridge, quota
+              control, and replay-safe traces.
             </h2>
             <p>
               Canonical request types, loss-aware transcoding, and budget
-              settlement stay in one operational frame instead of being split
-              across vendor SDK glue.
+              settlement stay in one operational frame, and the repository ships
+              a Claude Skill that teaches agents where OmniLLM runtime behavior
+              ends and typed conversion helpers begin.
             </p>
           </div>
           <div className="omn-home__metric-grid">
@@ -353,11 +361,12 @@ export function LandingPage() {
 
       <section className="omn-home__showcase">
         <div className="omn-home__showcase-copy">
-          <span className="omn-home__section-kicker">Source-Adjacent Docs</span>
-          <h2>Operate the runtime without leaving repository context.</h2>
+          <span className="omn-home__section-kicker">Source-Adjacent Docs And Skill</span>
+          <h2>Operate the runtime and onboard AI agents from repository context.</h2>
           <p>
-            Usage notes, architecture rationale, and implementation walkthroughs
-            live beside the crate so behavior, design, and source stay aligned.
+            Usage notes, architecture rationale, implementation walkthroughs,
+            and the bundled Claude Skill live beside the crate so behavior,
+            design, AI guidance, and source stay aligned.
           </p>
           <ul className="omn-home__bullet-list">
             <li>
@@ -370,6 +379,10 @@ export function LandingPage() {
             <li>
               Implementation notes point directly back to the modules that
               enforce the behavior.
+            </li>
+            <li>
+              The bundled `skill/` package can be zipped and uploaded to
+              Claude.ai for OmniLLM-aware assistance.
             </li>
           </ul>
         </div>
