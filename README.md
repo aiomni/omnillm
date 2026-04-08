@@ -4,24 +4,26 @@ A production-grade Rust library for provider-neutral LLM access with multi-key l
 
 ## Documentation
 
-- [Detailed Usage Guide](./docs/usage.md)
-- [Architecture Notes](./docs/architecture.md)
-- [Implementation Notes](./docs/implementation.md)
+- [Detailed Usage Guide](./website/docs/usage.md)
+- [Architecture Notes](./website/docs/architecture.md)
+- [Implementation Notes](./website/docs/implementation.md)
 
 ## Website
 
-The documentation site is powered by Rspress with Markdown content from `docs/`
-and a custom theme from `theme/`.
+The documentation site lives in `website/`. Its Markdown content is in
+`website/docs/`, the custom theme is in `website/theme/`, and the Rspress
+config and TypeScript setup live alongside them.
 
 ```sh
+cd website
 npm install
 npm run site:dev
 npm run site:build
 ```
 
 The GitHub Actions deployment workflow builds the site on pushes to `main`
-and publishes `doc_build/` to the `gh-pages` branch. In repository settings,
-set GitHub Pages to deploy from the `gh-pages` branch root.
+and publishes `website/doc_build/` to the `gh-pages` branch. In repository
+settings, set GitHub Pages to deploy from the `gh-pages` branch root.
 
 ## Features
 

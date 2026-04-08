@@ -1,4 +1,13 @@
-# OmniLLM
+---
+title: Implementation Notes
+description: Walk the crate module by module when you want the concrete execution path, data structures, and internal boundaries.
+label: source walkthrough
+release: v0.1.0
+updated: Apr 2026
+summary: Module layout, error model, and the core structs that enforce pool, limiter, and budget behavior.
+---
+
+# Implementation Notes
 
 > Incorporates all review feedback: randomized key selection, per-key parking_lot Mutex,
 > lazy cooldown evaluation, and zero zombie tasks.

@@ -2,6 +2,8 @@
 Cargo.lock
 /doc_build/
 /node_modules/
+/website/doc_build/
+/website/node_modules/
 
 # Editor and OS files
 .DS_Store

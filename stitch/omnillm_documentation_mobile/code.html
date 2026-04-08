@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#2d3133",
+                        "tertiary-container": "#c63b26",
+                        "on-primary-fixed": "#001a41",
+                        "error-container": "#93000a",
+                        "primary-fixed-dim": "#adc6ff",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#0f1419",
+                        "surface-tint": "#adc6ff",
+                        "surface-container-highest": "#30353b",
+                        "on-secondary-fixed-variant": "#444749",
+                        "on-secondary-fixed": "#191c1e",
+                        "surface": "#0f1419",
+                        "outline-variant": "#424753",
+                        "error": "#ffb4ab",
+                        "primary": "#adc6ff",
+                        "inverse-on-surface": "#2c3137",
+                        "tertiary-fixed": "#ffdad4",
+                        "on-surface": "#dee3eb",
+                        "secondary-container": "#46494b",
+                        "inverse-surface": "#dee3eb",
+                        "tertiary": "#ffb4a6",
+                        "on-primary": "#002e68",
+                        "on-tertiary-fixed": "#3f0300",
+                        "on-tertiary-fixed-variant": "#8f1202",
+                        "primary-container": "#0969da",
+                        "surface-bright": "#353a40",
+                        "primary-fixed": "#d8e2ff",
+                        "outline": "#8c909f",
+                        "surface-variant": "#30353b",
+                        "surface-container": "#1b2026",
+                        "surface-container-lowest": "#0a0f14",
+                        "on-primary-fixed-variant": "#004493",
+                        "on-background": "#dee3eb",
+                        "secondary-fixed": "#e0e3e5",
+                        "on-tertiary-container": "#ffece9",
+                        "surface-container-low": "#171c22",
+                        "on-tertiary": "#660700",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "tertiary-fixed-dim": "#ffb4a6",
+                        "background": "#0f1419",
+                        "secondary": "#c4c7c9",
+                        "on-primary-container": "#ecefff",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#b6b9bb",
+                        "inverse-primary": "#005bc0",
+                        "surface-container-high": "#252a30"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(48, 53, 59, 0.6);
+            backdrop-filter: blur(24px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0f1419] dark:bg-[#0f1419] tonal-transition bg-[#171c22]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#0969DA] dark:text-[#0969DA]" data-icon="terminal">terminal</span>
+<span class="text-xl font-bold tracking-widest text-slate-100 uppercase font-['Space_Grotesk'] tracking-tight">OmniLLM</span>
+</div>
+<button class="active:opacity-70 transition-all text-slate-100">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+</header>
+<!-- NavigationDrawer (Mobile State: Hidden by default, conceptually active here) -->
+<!-- This represents the drawer content when triggered -->
+<div class="hidden fixed inset-0 z-[60] bg-surface/80 backdrop-blur-sm">
+<aside class="fixed inset-y-0 left-0 z-[60] flex flex-col bg-[#0f1419] dark:bg-[#0f1419] font-['Space_Grotesk'] font-bold rounded-r-none h-full w-80 border-r border-slate-800/30 shadow-[0_0_50px_rgba(9,105,218,0.08)]">
+<div class="p-6 border-b border-outline-variant/10">
+<span class="text-slate-100 font-mono text-sm uppercase tracking-widest">OmniLLM :: Engine</span>
+</div>
+<nav class="flex-1 py-4">
+<div class="px-6 py-3 text-[#0969DA] bg-[#171c22] border-l-2 border-[#0969DA] flex items-center gap-3 cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="package">package</span>
+<span>Crates</span>
+</div>
+<div class="px-6 py-3 text-slate-500 hover:text-slate-200 hover:bg-[#30353b]/50 flex items-center gap-3 cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span>Documentation</span>
+</div>
+<div class="px-6 py-3 text-slate-500 hover:text-slate-200 hover:bg-[#30353b]/50 flex items-center gap-3 cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span>Benchmarks</span>
+</div>
+<div class="px-6 py-3 text-slate-500 hover:text-slate-200 hover:bg-[#30353b]/50 flex items-center gap-3 cursor-pointer transition-all">
+<span class="material-symbols-outlined" data-icon="code">code</span>
+<span>GitHub</span>
+</div>
+</nav>
+</aside>
+</div>
+<main class="pt-24 pb-12 px-6 max-w-full">
+<!-- Hero Section / Title -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<span class="font-mono text-[10px] text-primary uppercase tracking-widest px-2 py-0.5 bg-primary-container/20 rounded">v0.4.2-stable</span>
+</div>
+<h1 class="text-4xl font-headline font-bold text-on-surface tracking-tight leading-none mb-6">Getting Started</h1>
+<p class="text-on-surface-variant text-lg leading-relaxed max-w-md">
+                Deploying high-performance LLM inference in Rust. Minimal overhead, maximum throughput.
+            </p>
+</section>
+<!-- Performance Mandate Stats (Bento-style Grid for Mobile) -->
+<section class="grid grid-cols-1 gap-4 mb-12">
+<div class="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>
+<span class="font-mono text-xs text-slate-500 mb-1 block">LATENCY_P99</span>
+<div class="text-3xl font-headline font-bold text-on-surface">14.2ms</div>
+<div class="mt-4 w-full h-0.5 bg-surface-container-highest">
+<div class="h-full bg-gradient-to-r from-primary to-tertiary w-[85%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-low p-6 rounded-lg">
+<span class="font-mono text-xs text-slate-500 mb-1 block">MEMORY_FOOTPRINT</span>
+<div class="text-3xl font-headline font-bold text-on-surface">42MB</div>
+<p class="text-xs text-on-surface-variant mt-2 font-mono">BASE_RUNTIME_IDLE</p>
+</div>
+</section>
+<!-- Installation Instructions -->
+<section class="mb-12">
+<h2 class="text-xl font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+<span class="text-primary text-sm font-mono">01.</span> Installation
+            </h2>
+<div class="bg-surface-container-lowest p-5 rounded-lg border border-outline-variant/10 shadow-inner">
+<div class="flex justify-between items-center mb-4 border-b border-outline-variant/5 pb-2">
+<span class="font-mono text-xs text-slate-500">Cargo.toml</span>
+<span class="material-symbols-outlined text-sm text-slate-500" data-icon="content_copy">content_copy</span>
+</div>
+<pre class="font-mono text-sm text-primary-fixed-dim overflow-x-auto whitespace-pre"><code><span class="text-tertiary">[dependencies]</span>
+<span class="text-on-surface">omnillm</span> = <span class="text-primary">"0.4.2"</span>
+<span class="text-on-surface">tokio</span> = { <span class="text-on-surface-variant">version</span> = <span class="text-primary">"1"</span>, <span class="text-on-surface-variant">features</span> = [<span class="text-primary">"full"</span>] }</code></pre>
+</div>
+</section>
+<!-- Quick Implementation -->
+<section class="mb-12">
+<h2 class="text-xl font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+<span class="text-primary text-sm font-mono">02.</span> Quick Implementation
+            </h2>
+<p class="text-on-surface-variant text-sm mb-4 leading-relaxed">
+                Initialize the engine using the <code class="bg-surface-container-highest px-1 rounded text-primary">OmniRuntime</code> builder for optimized GPU scheduling.
+            </p>
+<div class="bg-surface-container-lowest p-5 rounded-lg border border-outline-variant/10 shadow-inner overflow-hidden">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-2.5 h-2.5 rounded-full bg-red-500/20"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-amber-500/20"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-emerald-500/20"></div>
+</div>
+<pre class="font-mono text-[13px] leading-relaxed text-on-surface overflow-x-auto"><code><span class="text-tertiary">use</span> <span class="text-on-surface">omnillm::prelude::*;</span>
+
+<span class="text-primary-fixed-dim">#[tokio::main]</span>
+<span class="text-tertiary">async fn</span> <span class="text-primary">main</span>() -&gt; <span class="text-on-surface">Result&lt;()&gt; {</span>
+    <span class="text-slate-500">// Init with default hardware config</span>
+    <span class="text-tertiary">let</span> engine = <span class="text-on-surface">OmniEngine::</span><span class="text-primary">new</span>()
+        .<span class="text-primary">with_acceleration</span>(<span class="text-on-surface">Hardware::Cuda</span>)
+        .<span class="text-primary">build</span>()
+        .<span class="text-tertiary">await</span>?;
+
+    <span class="text-slate-500">// Zero-copy inference</span>
+    <span class="text-tertiary">let</span> response = engine.<span class="text-primary">infer</span>(<span class="text-primary">"Analyze trait safety"</span>)
+        .<span class="text-tertiary">await</span>?;
+
+    <span class="text-on-surface">Ok(())</span>
+}</code></pre>
+</div>
+</section>
+<!-- Visual Anchor / Decorative -->
+<section class="mb-12">
+<div class="relative h-48 rounded-xl overflow-hidden grayscale contrast-125 opacity-60">
+<img alt="Engine visualization" class="w-full h-full object-cover" data-alt="Abstract 3D digital wireframe of complex node network with glowing blue particles and dark industrial background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCo7kfmHgF9hAzO9o1waZQt_himtuK7-S6nEWU1CN3ZjRz7xdMvjUZzs1xYlo259GIqzfYNGG7jc5ihFApE5q3oyvJ4RCzpn8p8XJmiz-ACuqqKOwH19ufmS2gBBh5X_eXmgNAglx_o3HqozTL-VIV7R0kImBNzkyCBE3UwY5IAnP55uIhcI2mpdzXtWdM03QeLYboL0AK9JGa7TRqX-0ghRqKP0EXYpvo-LE1j8vwL_RQ_Tr0M6Rh1hV15YWPUBJ9KV2XTEt8E-w"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface to-transparent"></div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 px-6 flex flex-col items-center gap-4 bg-[#0f1419] dark:bg-[#0f1419] border-t border-slate-800/20 tonal-shift-low bg-[#171c22]">
+<div class="text-slate-600 font-mono text-[10px] uppercase tracking-tighter">
+            © 2024 OMNILLM_ENGINE :: BUILT_WITH_RUST
+        </div>
+<div class="flex gap-6">
+<a class="text-slate-500 font-mono text-[10px] uppercase tracking-tighter transition-opacity duration-300 hover:text-[#0969DA]" href="#">Terms</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase tracking-tighter transition-opacity duration-300 hover:text-[#0969DA]" href="#">Privacy</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase tracking-tighter transition-opacity duration-300 hover:text-[#0969DA]" href="#">Security</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase tracking-tighter transition-opacity duration-300 hover:text-[#0969DA]" href="#">Status</a>
+</div>
+</footer>
+<!-- Mobile Navigation Bar (Bottom) - Restricted to main nav as per rules -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container-low border-t border-outline-variant/10 flex items-center justify-around px-2 z-50">
+<button class="flex flex-col items-center gap-1 text-[#0969DA]">
+<span class="material-symbols-outlined text-xl" data-icon="package" style="font-variation-settings: 'FILL' 1;">package</span>
+<span class="font-mono text-[10px] uppercase tracking-tighter">Crates</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined text-xl" data-icon="menu_book">menu_book</span>
+<span class="font-mono text-[10px] uppercase tracking-tighter">Docs</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined text-xl" data-icon="speed">speed</span>
+<span class="font-mono text-[10px] uppercase tracking-tighter">Stats</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined text-xl" data-icon="code">code</span>
+<span class="font-mono text-[10px] uppercase tracking-tighter">Repo</span>
+</button>
+</nav>
+<div class="h-16 md:hidden"></div> <!-- Spacer for BottomNav -->
+</body></html>

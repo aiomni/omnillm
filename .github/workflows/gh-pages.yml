@@ -27,11 +27,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: website/package-lock.json
 
       - name: Install dependencies
+        working-directory: website
         run: npm ci
 
       - name: Build site
+        working-directory: website
         env:
           RSPRESS_BASE: /${{ github.event.repository.name }}/
         run: npm run site:build
@@ -57,7 +60,7 @@ jobs:
           fi
 
           find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          cp -R "$GITHUB_WORKSPACE"/doc_build/. .
+          cp -R "$GITHUB_WORKSPACE"/website/doc_build/. .
           touch .nojekyll
 
           git add --all

@@ -1,5 +1,5 @@
 {
-  "name": "omnillm-site",
+  "name": "omnillm-website",
   "private": true,
   "scripts": {
     "site:dev": "rspress dev -c rspress.config.ts --host 0.0.0.0",

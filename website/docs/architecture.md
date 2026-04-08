@@ -1,4 +1,13 @@
-# LLM Gateway Core — Architecture Document
+---
+title: Architecture Notes
+description: Read the key-pool acquisition model, lease lifecycle, and budget tracker design before diving into the source.
+label: system design
+release: v0.1.0
+updated: Apr 2026
+summary: Random-start acquisition, explicit cooldown semantics, and fixed-point budget settlement across the runtime.
+---
+
+# Architecture Notes
 
 > Production-grade Rust scheduling kernel for LLM API access.
 > Handles multi-key load balancing, per-key rate limiting, cost tracking,

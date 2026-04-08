@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OmniLLM :: High Performance Engine</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#2d3133",
+                    "tertiary-container": "#c63b26",
+                    "on-primary-fixed": "#001a41",
+                    "error-container": "#93000a",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-surface-variant": "#c2c6d6",
+                    "on-error-container": "#ffdad6",
+                    "surface-dim": "#0f1419",
+                    "surface-tint": "#adc6ff",
+                    "surface-container-highest": "#30353b",
+                    "on-secondary-fixed-variant": "#444749",
+                    "on-secondary-fixed": "#191c1e",
+                    "surface": "#0f1419",
+                    "outline-variant": "#424753",
+                    "error": "#ffb4ab",
+                    "primary": "#adc6ff",
+                    "inverse-on-surface": "#2c3137",
+                    "tertiary-fixed": "#ffdad4",
+                    "on-surface": "#dee3eb",
+                    "secondary-container": "#46494b",
+                    "inverse-surface": "#dee3eb",
+                    "tertiary": "#ffb4a6",
+                    "on-primary": "#002e68",
+                    "on-tertiary-fixed": "#3f0300",
+                    "on-tertiary-fixed-variant": "#8f1202",
+                    "primary-container": "#0969da",
+                    "surface-bright": "#353a40",
+                    "primary-fixed": "#d8e2ff",
+                    "outline": "#8c909f",
+                    "surface-variant": "#30353b",
+                    "surface-container": "#1b2026",
+                    "surface-container-lowest": "#0a0f14",
+                    "on-primary-fixed-variant": "#004493",
+                    "on-background": "#dee3eb",
+                    "secondary-fixed": "#e0e3e5",
+                    "on-tertiary-container": "#ffece9",
+                    "surface-container-low": "#171c22",
+                    "on-tertiary": "#660700",
+                    "secondary-fixed-dim": "#c4c7c9",
+                    "tertiary-fixed-dim": "#ffb4a6",
+                    "background": "#0f1419",
+                    "secondary": "#c4c7c9",
+                    "on-primary-container": "#ecefff",
+                    "on-error": "#690005",
+                    "on-secondary-container": "#b6b9bb",
+                    "inverse-primary": "#005bc0",
+                    "surface-container-high": "#252a30"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .text-glow {
+            text-shadow: 0 0 15px rgba(9, 105, 218, 0.4);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-white">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 tonal-transition bg-[#171c22] flat no shadows">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#0969DA]" data-icon="terminal">terminal</span>
+<h1 class="text-xl font-bold tracking-widest text-slate-100 uppercase font-['Space_Grotesk']">OmniLLM</h1>
+</div>
+<button class="active:opacity-70 transition-all">
+<span class="material-symbols-outlined text-slate-400" data-icon="menu">menu</span>
+</button>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-lg mx-auto">
+<!-- Hero Section -->
+<section class="mb-16">
+<div class="mb-2">
+<span class="font-mono text-[10px] tracking-widest text-primary uppercase">Engine_v0.8.2</span>
+</div>
+<h2 class="text-5xl font-headline font-bold leading-tight tracking-tighter mb-6 text-glow">
+                THE<br/>MODULAR<br/>CORE
+            </h2>
+<p class="text-on-surface-variant font-body leading-relaxed text-sm">
+                OmniLLM is engineered for high-throughput inference and memory safety, leveraging Rust's ownership model to minimize latency overhead.
+            </p>
+</section>
+<!-- The Modular Core Diagram (Vertical Stack) -->
+<section class="mb-20 space-y-4">
+<div class="bg-surface-container-low p-1 border-l-2 border-primary">
+<div class="p-6 bg-surface-container">
+<div class="flex justify-between items-start mb-4">
+<span class="font-mono text-[10px] text-primary">LAYER_03</span>
+<span class="material-symbols-outlined text-primary text-sm" data-icon="api">api</span>
+</div>
+<h3 class="font-headline font-bold text-lg mb-2">Application Interface</h3>
+<p class="text-xs text-on-surface-variant font-mono uppercase tracking-tight">high-level abstractions</p>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="material-symbols-outlined text-outline-variant" data-icon="south">south</span>
+</div>
+<div class="bg-surface-container-low p-1 border-l-2 border-tertiary">
+<div class="p-6 bg-surface-container">
+<div class="flex justify-between items-start mb-4">
+<span class="font-mono text-[10px] text-tertiary">LAYER_02</span>
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="memory">memory</span>
+</div>
+<h3 class="font-headline font-bold text-lg mb-2">Inference Engine</h3>
+<p class="text-xs text-on-surface-variant font-mono uppercase tracking-tight">quantized kernels &amp; cuda</p>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="material-symbols-outlined text-outline-variant" data-icon="south">south</span>
+</div>
+<div class="bg-surface-container-low p-1 border-l-2 border-outline">
+<div class="p-6 bg-surface-container">
+<div class="flex justify-between items-start mb-4">
+<span class="font-mono text-[10px] text-outline">LAYER_01</span>
+<span class="material-symbols-outlined text-outline text-sm" data-icon="settings_ethernet">settings_ethernet</span>
+</div>
+<h3 class="font-headline font-bold text-lg mb-2">Memory Manager</h3>
+<p class="text-xs text-on-surface-variant font-mono uppercase tracking-tight">zero-copy tensor sharing</p>
+</div>
+</div>
+</section>
+<!-- Key Features Cards -->
+<section class="mb-20 space-y-6">
+<div class="flex items-center gap-4 mb-8">
+<div class="h-px flex-1 bg-outline-variant/30"></div>
+<h4 class="font-mono text-[10px] uppercase tracking-widest text-on-surface-variant">Key Features</h4>
+<div class="h-px flex-1 bg-outline-variant/30"></div>
+</div>
+<!-- Card 1 -->
+<div class="bg-surface-container-low rounded-lg p-6 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+<span class="material-symbols-outlined text-6xl" data-icon="verified_user">verified_user</span>
+</div>
+<h4 class="font-headline font-bold text-xl mb-3">Type Safety</h4>
+<p class="text-sm text-on-surface-variant leading-relaxed mb-4">
+                    Eliminate runtime crashes before they happen. OmniLLM uses Rust's strict typing to ensure tensor dimensions always match at compile time.
+                </p>
+<div class="inline-block bg-primary-container/10 px-3 py-1 rounded-full">
+<span class="font-mono text-[10px] text-primary">MEMORY_SAFE</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-low rounded-lg p-6 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+<span class="material-symbols-outlined text-6xl" data-icon="bolt">bolt</span>
+</div>
+<h4 class="font-headline font-bold text-xl mb-3">Async-First</h4>
+<p class="text-sm text-on-surface-variant leading-relaxed mb-4">
+                    Non-blocking I/O allows for massive concurrent request handling without spawning thousands of threads. Scalability is baked in.
+                </p>
+<div class="inline-block bg-primary-container/10 px-3 py-1 rounded-full">
+<span class="font-mono text-[10px] text-primary">TOKIO_RUN</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-low rounded-lg p-6 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+<span class="material-symbols-outlined text-6xl" data-icon="rebase_edit">rebase_edit</span>
+</div>
+<h4 class="font-headline font-bold text-xl mb-3">Zero-Cost Abstractions</h4>
+<p class="text-sm text-on-surface-variant leading-relaxed mb-4">
+                    Higher-level APIs that compile down to the same efficient machine code as hand-written assembly. No performance penalty for clean code.
+                </p>
+<div class="inline-block bg-primary-container/10 px-3 py-1 rounded-full">
+<span class="font-mono text-[10px] text-primary">LLVM_OPTIMIZED</span>
+</div>
+</div>
+</section>
+<!-- Benchmarks Section -->
+<section class="mb-20">
+<h4 class="font-headline font-bold text-3xl mb-10 tracking-tight text-center">BENCHMARKS</h4>
+<div class="bg-surface-container-lowest p-6 rounded-xl space-y-12">
+<!-- Bar 1 -->
+<div>
+<div class="flex justify-between items-end mb-3">
+<span class="font-mono text-xs text-on-surface">OmniLLM Engine</span>
+<span class="font-mono text-sm font-bold text-primary">14.2k req/s</span>
+</div>
+<div class="h-10 w-full bg-surface-container-highest rounded-sm overflow-hidden flex items-center px-1">
+<div class="h-8 bg-gradient-to-r from-primary-container to-primary rounded-sm shadow-[0_0_15px_rgba(9,105,218,0.3)]" style="width: 95%"></div>
+</div>
+</div>
+<!-- Bar 2 -->
+<div>
+<div class="flex justify-between items-end mb-3">
+<span class="font-mono text-xs text-on-surface">Python-Based Wrappers</span>
+<span class="font-mono text-sm font-bold text-tertiary">2.1k req/s</span>
+</div>
+<div class="h-10 w-full bg-surface-container-highest rounded-sm overflow-hidden flex items-center px-1">
+<div class="h-8 bg-surface-container-low border-l-2 border-tertiary rounded-sm" style="width: 25%"></div>
+</div>
+</div>
+<!-- Bar 3 -->
+<div>
+<div class="flex justify-between items-end mb-3">
+<span class="font-mono text-xs text-on-surface">C++ Generic Frameworks</span>
+<span class="font-mono text-sm font-bold text-on-surface-variant">9.8k req/s</span>
+</div>
+<div class="h-10 w-full bg-surface-container-highest rounded-sm overflow-hidden flex items-center px-1">
+<div class="h-8 bg-outline-variant/30 rounded-sm" style="width: 65%"></div>
+</div>
+</div>
+<p class="text-[10px] font-mono text-on-surface-variant text-center uppercase tracking-widest pt-4">
+                    Testing: Llama-3-70B @ 4-bit Quantization / H100 Dual GPU
+                </p>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="text-center">
+<button class="w-full bg-gradient-to-br from-primary-container to-on-primary-fixed-variant text-on-primary font-mono font-bold py-5 px-8 rounded-md tracking-widest active:scale-[0.98] transition-transform">
+                GET_STARTED_::
+            </button>
+<button class="mt-6 font-mono text-xs text-on-surface-variant uppercase tracking-widest hover:text-primary transition-colors">
+                Read Documentation -&gt;
+            </button>
+</section>
+</main>
+<!-- BottomNavBar / Navigation (Mobile Context) -->
+<nav class="fixed bottom-0 w-full z-50 bg-[#0f1419] flex md:hidden items-center justify-around h-16 border-t border-slate-800/20">
+<a class="flex flex-col items-center justify-center gap-1 text-[#0969DA] font-mono" href="#">
+<span class="material-symbols-outlined" data-icon="package">package</span>
+<span class="text-[9px] uppercase">Crates</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="text-[9px] uppercase">Docs</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="text-[9px] uppercase">Stats</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-200 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="code">code</span>
+<span class="text-[9px] uppercase">Repo</span>
+</a>
+</nav>
+<!-- Footer -->
+<footer class="w-full py-12 px-6 flex flex-col items-center gap-4 tonal-shift-low bg-[#171c22] border-t border-slate-800/20 pb-24">
+<div class="text-slate-600 font-mono text-[10px] uppercase tracking-tighter">
+            © 2024 OMNILLM_ENGINE :: BUILT_WITH_RUST
+        </div>
+<div class="flex gap-6">
+<a class="text-slate-500 font-mono text-[10px] uppercase hover:text-[#0969DA] transition-colors" href="#">Terms</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase hover:text-[#0969DA] transition-colors" href="#">Privacy</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase hover:text-[#0969DA] transition-colors" href="#">Security</a>
+<a class="text-slate-500 font-mono text-[10px] uppercase hover:text-[#0969DA] transition-colors" href="#">Status</a>
+</div>
+</footer>
+</body></html>

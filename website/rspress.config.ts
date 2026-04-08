@@ -11,8 +11,9 @@ export default defineConfig({
   icon: '/favicon.svg',
   logo: '/omnillm-mark.svg',
   themeConfig: {
+    darkMode: false,
     nav: [
-      { text: 'Launchpad', link: '/' },
+      { text: 'Overview', link: '/', activeMatch: '^(?:/|/index(?:\\.html)?)$' },
       { text: 'Usage', link: '/usage' },
       { text: 'Architecture', link: '/architecture' },
       { text: 'Implementation', link: '/implementation' },
@@ -23,7 +24,7 @@ export default defineConfig({
         {
           text: 'Start Here',
           items: [
-            { text: 'Launchpad', link: '/' },
+            { text: 'Overview', link: '/' },
             { text: 'Usage Guide', link: '/usage' }
           ]
         },
@@ -37,7 +38,7 @@ export default defineConfig({
       ]
     },
     editLink: {
-      docRepoBaseUrl: 'https://github.com/aiomni/omnillm/edit/main/docs',
+      docRepoBaseUrl: 'https://github.com/aiomni/omnillm/edit/main/website/docs',
       text: 'Edit this page on GitHub'
     }
   }
