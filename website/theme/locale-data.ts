@@ -87,6 +87,17 @@ type ChromeText = {
 export const DEFAULT_LANGUAGE: SiteLanguage = 'en';
 export const LANGUAGE_STORAGE_KEY = 'omnillm.language';
 export const SUPPORTED_LANGUAGES: SiteLanguage[] = ['en', 'zh'];
+export const SITE_BASE = normalizeBase(process.env.RSPRESS_BASE ?? '/');
+
+function normalizeBase(path: string) {
+  const trimmed = path.trim();
+
+  if (!trimmed || trimmed === '/') {
+    return '/';
+  }
+
+  return `/${trimmed.replace(/^\/+|\/+$/g, '')}/`;
+}
 
 function rootActiveMatch(lang: SiteLanguage) {
   if (lang === 'zh') {
@@ -124,8 +135,45 @@ function normalizeInternalPath(path: string) {
   return withoutHtml || '/';
 }
 
-export function stripLanguagePrefix(path: string) {
+function stripSiteBase(path: string) {
   const normalized = normalizeInternalPath(path);
+
+  if (SITE_BASE === '/') {
+    return normalized;
+  }
+
+  const basePrefix = SITE_BASE.slice(0, -1);
+
+  if (normalized === basePrefix) {
+    return '/';
+  }
+
+  if (normalized.startsWith(`${basePrefix}/`)) {
+    return normalized.slice(basePrefix.length) || '/';
+  }
+
+  return normalized;
+}
+
+export function withSiteBase(path: string) {
+  if (!path || path.startsWith('#') || isExternalPath(path)) {
+    return path;
+  }
+
+  const { hash, pathname } = splitHash(path);
+  const normalized = normalizeInternalPath(pathname);
+
+  let resolved = normalized;
+  if (SITE_BASE !== '/') {
+    const basePrefix = SITE_BASE.slice(0, -1);
+    resolved = normalized === '/' ? SITE_BASE : `${basePrefix}${normalized}`;
+  }
+
+  return hash ? `${resolved}#${hash}` : resolved;
+}
+
+export function stripLanguagePrefix(path: string) {
+  const normalized = stripSiteBase(path);
 
   if (normalized === '/zh') {
     return '/';
@@ -155,8 +203,13 @@ export function localizePath(path: string, lang: SiteLanguage) {
   return hash ? `${localizedPath}#${hash}` : localizedPath;
 }
 
+export function localizeBrowserPath(path: string, lang: SiteLanguage) {
+  return withSiteBase(localizePath(path, lang));
+}
+
 export function inferLanguageFromPathname(pathname: string): SiteLanguage {
-  return stripLanguagePrefix(pathname) !== normalizeInternalPath(pathname) ? 'zh' : 'en';
+  const normalized = stripSiteBase(pathname);
+  return stripLanguagePrefix(normalized) !== normalized ? 'zh' : 'en';
 }
 
 export function canonicalRouteFromRelativePath(relativePath?: string) {

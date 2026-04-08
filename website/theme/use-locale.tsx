@@ -10,6 +10,7 @@ import {
   chromeText,
   homeContent,
   inferLanguageFromPathname,
+  localizeBrowserPath,
   localizePath,
   pageSourcePath
 } from './locale-data';
@@ -84,5 +85,5 @@ export function shouldRedirectHomeToPreferredLanguage(pathname: string) {
     return null;
   }
 
-  return localizePath('/', preferredLanguage);
+  return localizeBrowserPath('/', preferredLanguage);
 }

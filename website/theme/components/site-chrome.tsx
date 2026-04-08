@@ -39,14 +39,14 @@ function LanguageSwitcher() {
         }
 
         return (
-          <a
+          <Link
             className="omn-lang-switcher__item"
-            href={switchPath(targetLang)}
             key={targetLang}
             onClick={() => rememberLanguagePreference(targetLang)}
+            to={switchPath(targetLang)}
           >
             {label}
-          </a>
+          </Link>
         );
       })}
     </div>
