@@ -1,4 +1,5 @@
 /target/
+/dist/
 Cargo.lock
 /doc_build/
 /node_modules/

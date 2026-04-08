@@ -78,11 +78,28 @@ is a first-party, repo-native integration for Claude, so the assistant can load
 OmniLLM-specific guidance for the gateway runtime, protocol conversion,
 multi-endpoint typed APIs, replay sanitization, and common runtime errors.
 
+### Packaged Bundles
+
+The repository ships a GitHub Actions workflow that builds two separate zip
+bundles:
+
+- `omnillm-rust-library-v*.zip`
+  a source bundle built from the crate's packaged publish contents
+
+- `omnillm-claude-skill-v*.zip`
+  a Claude-uploadable Skill archive whose zip root is `SKILL.md`,
+  `references/`, and `assets/`
+
+The workflow is defined in
+[`package-bundles.yml`](https://github.com/aiomni/omnillm/blob/main/.github/workflows/package-bundles.yml).
+It uploads artifacts on pushes to `main` and manual dispatches, and it attaches
+the same bundles to tagged releases.
+
 ### Install It
 
-1. Clone or download the repository.
-2. Zip the `skill/` directory.
-3. Upload the zip in Claude.ai → Settings → Capabilities → Skills → Upload.
+1. Download `omnillm-claude-skill-v*.zip` from the latest release or the latest
+   successful `Package Bundles` workflow run.
+2. Upload the zip in Claude.ai → Settings → Capabilities → Skills → Upload.
 
 ### Use It
 

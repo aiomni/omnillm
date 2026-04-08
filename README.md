@@ -24,11 +24,28 @@ The bundled Skill is tuned for repository-native signals such as:
 - `ReplayFixture`, `sanitize_transport_request`, `OMNILLM_RESPONSES_*`
 - runtime errors like `NoAvailableKey`, `BudgetExceeded`, and `Protocol(...)`
 
+### Packaged Bundles
+
+GitHub Actions builds two separate zip bundles:
+
+- `omnillm-rust-library-v*.zip`
+  The Rust library source bundle, packaged from the actual crate publish
+  contents.
+
+- `omnillm-claude-skill-v*.zip`
+  A Claude-uploadable Skill bundle whose zip root is `SKILL.md`,
+  `references/`, and `assets/`.
+
+The workflow lives at
+[`/.github/workflows/package-bundles.yml`](./.github/workflows/package-bundles.yml).
+It uploads artifacts on every push to `main` and `workflow_dispatch`, and it
+also attaches the bundles to tagged releases.
+
 ### Install The Skill
 
-1. Clone or download this repository.
-2. Zip the `skill/` directory.
-3. Upload the zip in Claude.ai → Settings → Capabilities → Skills → Upload.
+1. Download `omnillm-claude-skill-v*.zip` from the latest GitHub Release or
+   from the latest successful `Package Bundles` workflow run.
+2. Upload that zip in Claude.ai → Settings → Capabilities → Skills → Upload.
 
 ### Use The Skill
 
@@ -47,6 +64,7 @@ The documentation site source lives in the GitHub repository:
 - [website/docs](https://github.com/aiomni/omnillm/tree/main/website/docs)
 - [website/theme](https://github.com/aiomni/omnillm/tree/main/website/theme)
 - [GitHub Pages workflow](https://github.com/aiomni/omnillm/blob/main/.github/workflows/gh-pages.yml)
+- [Bundle packaging workflow](https://github.com/aiomni/omnillm/blob/main/.github/workflows/package-bundles.yml)
 
 ## Features
 
