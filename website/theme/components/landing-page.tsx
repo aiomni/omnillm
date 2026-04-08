@@ -29,7 +29,7 @@ type CodeLine = {
 const heroStats: HeroStat[] = [
   { value: "04", label: "generation protocols" },
   { value: "07", label: "provider families" },
-  { value: "01", label: "bundled Claude Skill" },
+  { value: "01", label: "bundled OmniLLM Skill" },
 ];
 
 const featureCards: FeatureCard[] = [
@@ -50,7 +50,7 @@ const featureCards: FeatureCard[] = [
   {
     eyebrow: "Operate",
     title: "Keep quota, replay, and provider state visible.",
-    copy: "Per-key limits, budget reservation, fixture sanitization, registry metadata, and the bundled Claude Skill all live next to the crate.",
+    copy: "Per-key limits, budget reservation, fixture sanitization, registry metadata, and the bundled OmniLLM Skill all live next to the crate.",
     detail: "budgets · replay · skill",
     accent: "#7fe0ff",
   },
@@ -62,6 +62,12 @@ const docCards: DocCard[] = [
     title: "Usage Guide",
     copy: "Install the crate, configure endpoints, send requests, stream results, and operate the runtime in production-shaped flows.",
     href: "/usage",
+  },
+  {
+    label: "Skill",
+    title: "Skill Guide",
+    copy: "Install the OmniLLM Skill in Claude Code, Codex, OpenCode, or Claude and keep agents aligned with the crate's real boundaries.",
+    href: "/skill",
   },
   {
     label: "Design",
@@ -301,18 +307,18 @@ export function LandingPage() {
             <span className="omn-home__badge">
               provider-neutral Rust runtime
             </span>
-            <span className="omn-home__badge">AI-native · Claude Skill included</span>
+            <span className="omn-home__badge">bundled OmniLLM Skill</span>
           </div>
           <h1>OmniLLM</h1>
           <p>
             Type-safe, high-performance LLM routing, protocol bridging, and
-            budget-aware multi-key execution for Rust, with a bundled Claude
-            Skill for repo-native AI workflows.
+            budget-aware multi-key execution for Rust, with a bundled OmniLLM
+            Skill in the repository.
           </p>
           <div className="omn-home__actions">
             <ActionLink href="/usage" label="Get Started" tone="primary" />
             <ActionLink
-              href="/usage#ai-native-skill"
+              href="/skill"
               label="Install Skill"
               tone="secondary"
             />
@@ -331,14 +337,11 @@ export function LandingPage() {
         <aside className="omn-home__hero-side">
           <div className="omn-home__signal">
             <span className="omn-home__section-kicker">AI-Native Runtime</span>
-            <h2>
-              One crate and one bundled Skill for routing and quota control.
-            </h2>
+            <h2>One runtime crate, plus an OmniLLM Skill.</h2>
             <p>
               Canonical request types, loss-aware transcoding, and budget
-              settlement stay in one operational frame, and the repository ships
-              a Claude Skill that teaches agents where OmniLLM runtime behavior
-              ends and typed conversion helpers begin.
+              settlement stay in one operational frame, and the repository also
+              includes the OmniLLM Skill for repo-native assistance.
             </p>
           </div>
           <div className="omn-home__metric-grid">
@@ -364,7 +367,7 @@ export function LandingPage() {
           <h2>Operate the runtime and onboard AI agents from repository context.</h2>
           <p>
             Usage notes, architecture rationale, implementation walkthroughs,
-            and the bundled Claude Skill live beside the crate so behavior,
+            and the bundled OmniLLM Skill live beside the crate so behavior,
             design, AI guidance, and source stay aligned.
           </p>
           <ul className="omn-home__bullet-list">
@@ -379,10 +382,7 @@ export function LandingPage() {
               Implementation notes point directly back to the modules that
               enforce the behavior.
             </li>
-            <li>
-              The bundled `skill/` package can be zipped and uploaded to
-              Claude.ai for OmniLLM-aware assistance.
-            </li>
+            <li>The Skill Guide covers Claude Code, Codex, OpenCode, and Claude installation paths.</li>
           </ul>
         </div>
 
