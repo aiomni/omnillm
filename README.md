@@ -35,8 +35,8 @@ website version lives in
 
 ### Install The Skill
 
-See [`skill/README.md`](./skill/README.md) for Claude Code, Codex, OpenCode,
-and Claude installation instructions.
+See [`skill/README.md`](./skill/README.md) for Vercel Labs `skills` installer
+commands for Claude Code, Codex, and OpenCode.
 
 ### Use The Skill
 

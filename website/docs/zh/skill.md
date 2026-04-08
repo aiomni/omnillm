@@ -1,10 +1,10 @@
 ---
 title: 技能指南
-description: 在 Claude Code、Codex、OpenCode 或 Claude 中安装 OmniLLM Skill，并将其用于 OmniLLM 相关编码与调试。
+description: 通过 Vercel Labs skills 安装器把 OmniLLM Skill 安装到 Claude Code、Codex 或 OpenCode 中，并将其用于 OmniLLM 相关编码与调试。
 label: 技能指南
 release: v0.1.0
 updated: 2026 年 4 月
-summary: 安装路径、复制命令、zip 压缩包打包方式，以及在不同 agent 运行环境中的验证方法。
+summary: Vercel Labs skills CLI 命令、本地与 GitHub 源的安装方式，以及不同 agent 的验证方法。
 ---
 
 # 技能指南
@@ -20,94 +20,82 @@ OmniLLM 在仓库的
 
 如果你只需要 Rust 库，请返回 [使用指南](./usage.md)。这一页只讨论如何把 OmniLLM Skill 安装到编码智能体中。
 
-## 需要安装什么
+## 使用 Vercel Labs Skills 安装
 
-请把这个技能安装到名为 `omnillm` 的目录下。源码位于仓库中的 `skill/` 目录，但 skill 声明名是 `omnillm`，那些会校验 skill 名称的智能体也会要求安装目录与之保持一致。
+下面的命令统一使用 [Vercel Labs `skills` 安装器](https://github.com/vercel-labs/skills)。
 
-安装后的技能目录只需要包含：
+这个技能声明名是 `omnillm`。只要在命令里传 `--skill omnillm`，
+安装器就会自动创建正确的目标目录名。
+
+智能体运行时实际只需要：
 
 - `SKILL.md`
 - `references/`
 - `assets/`
 
-这个仓库还包含 `skill/README.md` 供人类阅读，但智能体运行环境并不需要它。
+安装器还可能额外写入 `README.md`，并在项目根目录生成
+`skills-lock.json`。
+
+下面的命令统一带上 `--copy`，这样安装后的 skill 会保持为目标 agent
+目录中的一份独立副本。
+
+## 选择安装源
+
+如果你已经 clone 了这个仓库，请先在仓库根目录确认本地检出能被识别：
+
+```sh
+npx skills add . --list
+```
+
+如果你不在本地检出目录里，也可以直接使用 GitHub 仓库：
+
+```sh
+npx skills add https://github.com/aiomni/omnillm --list
+```
 
 ## Claude Code
 
-Claude Code 同时支持项目级和个人级技能目录：
-
-- 项目级：`.claude/skills/omnillm/`
-- 全局级：`~/.claude/skills/omnillm/`
-
-在仓库根目录执行：
-
 ```sh
-DEST=.claude/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent claude-code --copy
 ```
 
-如果你希望这个技能在所有项目中可用，请把 `DEST` 改成 `~/.claude/skills/omnillm`。
+如果你希望安装到用户级位置，请追加 `-g`。
 
 ## Codex
 
-对于 Codex，请把这个技能安装到 `.agents/skills/` 目录中：
-
-- 仓库级：`.agents/skills/omnillm/`
-- 全局级：`~/.agents/skills/omnillm/`
-
-在仓库根目录执行：
-
 ```sh
-DEST=.agents/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent codex --copy
 ```
 
-如果把这个技能安装在仓库根目录，它也会对同一仓库下的子目录生效。
+如果你希望安装到用户级位置，请追加 `-g`。
 
 ## OpenCode
 
-OpenCode 既支持自己的技能目录，也兼容 Claude 风格和 `.agents` 风格的安装位置。
-
-推荐位置：
-
-- 项目级：`.opencode/skills/omnillm/`
-- 全局级：`~/.config/opencode/skills/omnillm/`
-
-兼容的替代位置：
-
-- `.claude/skills/omnillm/`
-- `~/.claude/skills/omnillm/`
-- `.agents/skills/omnillm/`
-- `~/.agents/skills/omnillm/`
-
-在仓库根目录执行：
-
 ```sh
-DEST=.opencode/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent opencode --copy
 ```
 
-## Claude
+如果你希望安装到用户级位置，请追加 `-g`。
 
-如果你想使用 Claude 的上传式技能流程，而不是本地智能体目录，可以构建一个 zip 压缩包，要求压缩包根目录直接包含 `SKILL.md`、`references/` 和 `assets/`：
-
-```sh
-cd skill
-zip -r ../omnillm-claude-skill.zip SKILL.md references assets
-```
-
-然后在 Claude 中依次进入 `Settings -> Capabilities -> Skills -> Upload` 上传这个 zip 压缩包。
+如果你更想直接从 GitHub 安装，把上面命令里的 `.` 替换成
+`https://github.com/aiomni/omnillm` 即可。
 
 ## 验证安装
 
-在你选择的智能体中开启一个新会话，然后提出一个 OmniLLM 相关的问题，例如：
+先用安装器确认某个 agent 已经能看到这个技能：
+
+```sh
+npx skills ls -a codex --json
+```
+
+把 `codex` 替换成 `claude-code` 或 `opencode` 即可。
+
+然后在你选择的智能体中开启一个新会话，并提出一个 OmniLLM 相关的问题，例如：
 
 - 用 `ProviderEndpoint` 和 `KeyConfig` 搭一个 `GatewayBuilder` 流程
 - 解释什么时候应该使用 `Gateway`，什么时候应该直接用 `transcode_*`
 - 排查 `NoAvailableKey`、`BudgetExceeded` 或 `Protocol(...)`
 - 把一个 `ApiRequest` 输出成 provider 的传输格式
 
-如果技能没有立即出现，请重启会话，并确认安装目录名称就是 `omnillm`。
+如果技能没有立即出现，请重启会话，并重新执行
+`npx skills ls -a <agent>`。

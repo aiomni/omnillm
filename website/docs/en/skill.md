@@ -1,10 +1,10 @@
 ---
 title: Skill Guide
-description: Install the OmniLLM Skill in Claude Code, Codex, OpenCode, or Claude, and use it for OmniLLM-aware coding and debugging.
+description: Install the OmniLLM Skill in Claude Code, Codex, or OpenCode with the Vercel Labs skills installer, and use it for OmniLLM-aware coding and debugging.
 label: skill guide
 release: v0.1.0
 updated: Apr 2026
-summary: Installation paths, copy commands, zip packaging, and verification across agent runtimes.
+summary: Vercel Labs skills CLI commands, local-vs-GitHub sources, and verification across agent runtimes.
 ---
 
 # Skill Guide
@@ -21,103 +21,84 @@ skill teaches agents the crate's real boundaries:
 If you only need the Rust crate, go back to [Usage Guide](./usage.md). This
 page is specifically about installing the OmniLLM Skill into coding agents.
 
-## What To Install
+## Install With Vercel Labs Skills
 
-Install the skill under a directory named `omnillm`. The source lives in the
-repository's `skill/` folder, but the skill's declared name is `omnillm`, and
-agents that validate skill names expect the installed directory to match.
+These instructions use the [Vercel Labs `skills` installer](https://github.com/vercel-labs/skills).
 
-The installed skill directory only needs:
+The skill is declared as `omnillm`. When you install with `--skill omnillm`,
+the installer creates the correct target directory name automatically.
+
+Agent runtimes only require:
 
 - `SKILL.md`
 - `references/`
 - `assets/`
 
-This repo also includes `skill/README.md` for humans, but agent runtimes do
-not require it.
+The installer may also add `README.md` next to the skill files and a
+project-level `skills-lock.json`.
+
+The commands below use `--copy` so the installed skill stays self-contained in
+the target agent directory.
+
+## Choose A Source
+
+From a local checkout, run the installer from the repository root:
+
+```sh
+npx skills add . --list
+```
+
+From anywhere else, use the GitHub repository directly:
+
+```sh
+npx skills add https://github.com/aiomni/omnillm --list
+```
 
 ## Claude Code
 
-Claude Code supports both project-local and personal skills:
-
-- project-local: `.claude/skills/omnillm/`
-- global: `~/.claude/skills/omnillm/`
-
-From the repository root:
-
 ```sh
-DEST=.claude/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent claude-code --copy
 ```
 
-Use `~/.claude/skills/omnillm` as `DEST` if you want the skill available in
-every project.
+Add `-g` for a user-level install.
 
 ## Codex
 
-For Codex, install the skill in an `.agents/skills/` directory:
-
-- repository-local: `.agents/skills/omnillm/`
-- global: `~/.agents/skills/omnillm/`
-
-From the repository root:
-
 ```sh
-DEST=.agents/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent codex --copy
 ```
 
-Installing at the repository root makes the skill available from subdirectories
-in the same repo.
+Add `-g` for a user-level install.
 
 ## OpenCode
 
-OpenCode supports its own skill directory plus Claude-compatible and
-agent-compatible locations.
-
-Recommended locations:
-
-- project-local: `.opencode/skills/omnillm/`
-- global: `~/.config/opencode/skills/omnillm/`
-
-Compatible alternatives:
-
-- `.claude/skills/omnillm/`
-- `~/.claude/skills/omnillm/`
-- `.agents/skills/omnillm/`
-- `~/.agents/skills/omnillm/`
-
-From the repository root:
-
 ```sh
-DEST=.opencode/skills/omnillm
-mkdir -p "$DEST"
-cp -R skill/SKILL.md skill/references skill/assets "$DEST"/
+npx skills add . --skill omnillm --agent opencode --copy
 ```
 
-## Claude
+Add `-g` for a user-level install.
 
-If you want Claude's uploaded-skill flow instead of local agent directories,
-build a zip whose root contains `SKILL.md`, `references/`, and `assets/`:
-
-```sh
-cd skill
-zip -r ../omnillm-claude-skill.zip SKILL.md references assets
-```
-
-Then upload the zip in Claude -> Settings -> Capabilities -> Skills -> Upload.
+If you prefer installing straight from GitHub, replace `.` with
+`https://github.com/aiomni/omnillm` in any of the commands above.
 
 ## Verify Installation
 
-Start a new session in your chosen agent and ask for something OmniLLM-specific,
-for example:
+Use the installer to confirm that the skill is present for the agent you care
+about:
+
+```sh
+npx skills ls -a codex --json
+```
+
+Replace `codex` with `claude-code` or `opencode` as needed.
+
+Then start a new session in your chosen agent and ask for something
+OmniLLM-specific, for example:
 
 - scaffold a `GatewayBuilder` flow with `ProviderEndpoint` and `KeyConfig`
 - explain when `Gateway` is correct versus `transcode_*`
 - debug `NoAvailableKey`, `BudgetExceeded`, or `Protocol(...)`
 - emit an `ApiRequest` into a provider wire format
 
-If the skill does not appear immediately, restart the session and verify that
-the install directory is named `omnillm`.
+If the skill does not appear immediately, restart the session and rerun
+`npx skills ls -a <agent>`.

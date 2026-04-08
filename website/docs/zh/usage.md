@@ -74,7 +74,7 @@ omnillm = { version = "0.1", default-features = false, features = ["native-tls"]
 
 OmniLLM 在仓库的
 [`skill/` 目录](https://github.com/aiomni/omnillm/tree/main/skill)
-中附带了一份官方 agent skill。如果你想把它安装到 Claude Code、Codex、OpenCode 或 Claude 中，请阅读 [技能指南](./skill.md)。
+中附带了一份官方 agent skill。如果你想通过 Vercel Labs skills 流程把它安装到 Claude Code、Codex 或 OpenCode 中，请阅读 [技能指南](./skill.md)。
 
 ## 核心概念
 

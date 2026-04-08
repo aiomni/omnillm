@@ -77,7 +77,7 @@ omnillm = { version = "0.1", default-features = false, features = ["native-tls"]
 OmniLLM ships with a first-party agent skill in the repository's
 [`skill/` directory](https://github.com/aiomni/omnillm/tree/main/skill). Use
 the [Skill Guide](./skill.md) when you want to install it in Claude Code,
-Codex, OpenCode, or Claude.
+Codex, or OpenCode with the Vercel Labs skills workflow.
 
 ## Core Concepts
 
