@@ -77,6 +77,9 @@ const docCards: DocCard[] = [
   },
 ];
 
+const codeIndent = "    ";
+const codeChainIndent = `${codeIndent}${codeIndent}`;
+
 const codeLines: CodeLine[] = [
   {
     line: "1",
@@ -96,7 +99,7 @@ const codeLines: CodeLine[] = [
     content: (
       <>
         <span className="omn-code__plain">
-          {" "}
+          {codeIndent}
           MessageRole, ProviderEndpoint, RequestItem{"}"};
         </span>
       </>
@@ -140,7 +143,8 @@ const codeLines: CodeLine[] = [
     line: "7",
     content: (
       <>
-        <span className="omn-code__keyword"> let</span>{" "}
+        <span className="omn-code__plain">{codeIndent}</span>
+        <span className="omn-code__keyword">let</span>{" "}
         <span className="omn-code__plain">gateway = GatewayBuilder::new(</span>
         <span className="omn-code__symbol">ProviderEndpoint</span>
         <span className="omn-code__plain">::openai_responses())</span>
@@ -151,9 +155,7 @@ const codeLines: CodeLine[] = [
     line: "8",
     content: (
       <>
-        <span className="omn-code__plain">
-          {"        "}.add_key(KeyConfig::new(
-        </span>
+        <span className="omn-code__plain">{codeChainIndent}.add_key(KeyConfig::new(</span>
         <span className="omn-code__string">"sk-key-1"</span>
         <span className="omn-code__plain">, </span>
         <span className="omn-code__string">"prod-1"</span>
@@ -165,7 +167,7 @@ const codeLines: CodeLine[] = [
     line: "9",
     content: (
       <>
-        <span className="omn-code__plain">{"        "}.build()?;</span>
+        <span className="omn-code__plain">{codeChainIndent}.build()?;</span>
       </>
     ),
   },
@@ -173,7 +175,8 @@ const codeLines: CodeLine[] = [
     line: "10",
     content: (
       <>
-        <span className="omn-code__keyword"> let</span>{" "}
+        <span className="omn-code__plain">{codeIndent}</span>
+        <span className="omn-code__keyword">let</span>{" "}
         <span className="omn-code__plain">
           request = LlmRequest::from(Message::text(
         </span>
@@ -190,7 +193,8 @@ const codeLines: CodeLine[] = [
     line: "11",
     content: (
       <>
-        <span className="omn-code__keyword"> let</span>{" "}
+        <span className="omn-code__plain">{codeIndent}</span>
+        <span className="omn-code__keyword">let</span>{" "}
         <span className="omn-code__plain">
           response = gateway.call(request, CancellationToken::new()).await?;
         </span>
@@ -201,7 +205,8 @@ const codeLines: CodeLine[] = [
     line: "12",
     content: (
       <>
-        <span className="omn-code__macro"> println!</span>
+        <span className="omn-code__plain">{codeIndent}</span>
+        <span className="omn-code__macro">println!</span>
         <span className="omn-code__plain">(</span>
         <span className="omn-code__string">"{}"</span>
         <span className="omn-code__plain">, response.content_text);</span>
@@ -212,7 +217,7 @@ const codeLines: CodeLine[] = [
     line: "13",
     content: (
       <>
-        <span className="omn-code__plain"> Ok(())</span>
+        <span className="omn-code__plain">{codeIndent}Ok(())</span>
       </>
     ),
   },
