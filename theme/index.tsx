@@ -6,7 +6,7 @@ const Layout = () => (
   <BasicLayout
     beforeNavTitle={
       <span className="omn-nav-chip" aria-hidden="true">
-        Rust runtime fabric
+        Dispatch rail
       </span>
     }
   />

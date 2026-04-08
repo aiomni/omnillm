@@ -11,73 +11,87 @@ type Tile = {
   href: string;
 };
 
+const providers = [
+  'OpenAI',
+  'Anthropic',
+  'Gemini',
+  'Vertex AI',
+  'Bedrock',
+  'Azure OpenAI',
+  'Compatible'
+];
+
 const metrics: Metric[] = [
   {
-    value: '4',
+    value: '04',
     label: 'wire protocols online',
-    copy: 'OpenAI Responses, Chat Completions, Claude Messages, and Gemini GenerateContent.'
+    copy:
+      'Responses, Chat Completions, Claude Messages, and Gemini GenerateContent run through one runtime surface.'
   },
   {
-    value: '6',
-    label: 'canonical endpoint families',
-    copy: 'Generation, embeddings, image, audio speech, audio transcription, and rerank.'
-  },
-  {
-    value: '7',
+    value: '07',
     label: 'provider families mapped',
-    copy: 'OpenAI, Azure OpenAI, Anthropic, Gemini, Vertex AI, Bedrock, and compatible endpoints.'
+    copy:
+      'OpenAI, Azure OpenAI, Anthropic, Gemini, Vertex AI, Bedrock, and compatible edges are already modeled.'
   },
   {
-    value: '2',
-    label: 'safety loops per request',
-    copy: 'Quota is pre-reserved before dispatch, then settled to actual usage after completion.'
+    value: '02',
+    label: 'quota passes per request',
+    copy:
+      'Capacity is reserved before dispatch, then reconciled against actual usage once the call settles.'
+  },
+  {
+    value: '00',
+    label: 'hidden downgrade stories',
+    copy:
+      'Bridge and lossy conversion semantics stay explicit so downstream systems know exactly what changed.'
   }
 ];
 
 const tracks: Tile[] = [
   {
-    kicker: 'Run',
-    title: 'Push one canonical request model through every provider edge.',
+    kicker: 'Dispatch',
+    title: 'Push one canonical request shape through every provider edge.',
     copy:
-      'Use GatewayBuilder, key pools, RPM and TPM controls, budget limits, and streaming events without hand-writing per-vendor call paths.',
+      'Use GatewayBuilder, key pools, RPM and TPM controls, budget ceilings, and streaming events without per-vendor glue code.',
     href: './usage#building-a-gateway'
   },
   {
     kicker: 'Bridge',
-    title: 'Transcode across protocols without hiding loss or bridge semantics.',
+    title: 'Transcode across protocols without smearing over loss or bridge semantics.',
     copy:
-      'Protocol and multi-endpoint conversions keep bridged and lossy metadata explicit so downstream systems know exactly what changed.',
+      'Conversions keep downgraded and bridged metadata visible so your app can decide what to trust and what to branch on.',
     href: './usage#protocol-parsing-and-emission'
   },
   {
-    kicker: 'Audit',
-    title: 'Capture replay fixtures without leaking secrets or binary noise.',
+    kicker: 'Replay',
+    title: 'Capture fixtures that are safe to ship back into test and audit loops.',
     copy:
-      'The replay sanitizers redact auth headers, query tokens, nested secrets, and large binary payloads before they reach your test corpus.',
+      'Replay sanitizers strip auth headers, nested secrets, query tokens, and bulky binary noise before data lands in your corpus.',
     href: './usage#replay-sanitization'
   }
 ];
 
 const pipeline: Tile[] = [
   {
-    kicker: '01 Acquire',
-    title: 'Random-start first-fit key selection',
+    kicker: 'Acquire',
+    title: 'Random-start first-fit key selection keeps hot pools from collapsing.',
     copy:
-      'Requests scan from a random entry point and reserve quota atomically so hot pools do not collapse onto the same least-loaded key.',
+      'Requests scan from a randomized entry point and reserve quota atomically so the same key is not hit by every caller.',
     href: './architecture#keypool-acquire-and-error-reporting'
   },
   {
-    kicker: '02 Reserve',
-    title: 'Budget pre-occupation before transport',
+    kicker: 'Reserve',
+    title: 'Budget is pre-occupied before transport leaves the process.',
     copy:
-      'Estimated cost is reserved before a request leaves the process, then refunded or topped up once usage metadata lands.',
+      'Estimated spend is held up front, then refunded or topped up when the provider returns usage metadata.',
     href: './architecture#budgettracker-fixed-point-lock-free'
   },
   {
-    kicker: '03 Dispatch',
-    title: 'Protocol-aware transport emission',
+    kicker: 'Settle',
+    title: 'Transport emission and post-call settlement stay on the same visible rail.',
     copy:
-      'Canonical requests fan out to the correct wire format and endpoint family without pushing vendor-specific conditionals into application code.',
+      'Canonical requests fan out to the right endpoint family, then reconcile quota and usage without hiding the end state.',
     href: './usage#multi-endpoint-api-layer'
   }
 ];
@@ -87,21 +101,21 @@ const docsCards: Tile[] = [
     kicker: 'Guide',
     title: 'Usage Guide',
     copy:
-      'Start here for installation, endpoint configuration, runtime calls, streaming, protocol conversion, and practical operating patterns.',
+      'Start with installation, endpoint configuration, runtime calls, streaming, protocol conversion, and operating patterns.',
     href: './usage'
   },
   {
-    kicker: 'Internals',
+    kicker: 'Architecture',
     title: 'Architecture Notes',
     copy:
-      'Understand the concurrency model, quota lease lifecycle, key pool acquisition algorithm, and why the critical path is cancellation-safe.',
+      'Understand the concurrency model, lease lifecycle, key acquisition algorithm, and the cancellation-safe critical path.',
     href: './architecture'
   },
   {
-    kicker: 'Source Walkthrough',
+    kicker: 'Implementation',
     title: 'Implementation Notes',
     copy:
-      'Trace the crate layout, core data structures, error taxonomy, and the gateway execution path file by file.',
+      'Trace the crate layout, core data structures, error taxonomy, and gateway execution flow file by file.',
     href: './implementation'
   }
 ];
@@ -109,15 +123,18 @@ const docsCards: Tile[] = [
 const feed = [
   {
     title: 'Runtime gateway',
-    copy: 'Canonical generation calls with multi-key balancing, per-key limits, circuit breaking, and request timeouts.'
+    copy:
+      'Canonical generation calls with multi-key balancing, circuit breaking, request timeouts, and provider dispatch.'
   },
   {
     title: 'Protocol trench tools',
-    copy: 'Parse, emit, and transcode raw payloads or typed endpoint requests without losing visibility into downgrade behavior.'
+    copy:
+      'Parse, emit, and transcode raw payloads or typed endpoint requests without losing visibility into downgrade behavior.'
   },
   {
     title: 'Provider registry',
-    copy: 'Inspect built-in provider coverage for native, compatible, and planned endpoint families directly in the crate.'
+    copy:
+      'Inspect built-in provider coverage for native, compatible, and planned endpoint families directly from the crate.'
   }
 ];
 
@@ -167,21 +184,20 @@ export function LandingPage() {
     <div className="omn-home">
       <section className="omn-home__hero">
         <div className="omn-home__hero-copy">
-          <span className="omn-home__eyebrow">OmniLLM control plane</span>
+          <span className="omn-home__eyebrow">OmniLLM runtime rail</span>
           <h1 className="omn-home__title">
-            Route every model call through one hard-edged Rust runtime.
+            One fast lane for every model request.
           </h1>
           <p className="omn-home__lede">
-            OmniLLM gives you a provider-neutral request surface, multi-key load
-            balancing, protocol bridging, circuit breaking, and budget-aware
-            execution in one crate. The site is tuned like a launch console:
-            bold overview up front, deep docs once you cross the threshold.
+            OmniLLM turns provider sprawl into a single Rust runtime: route,
+            transcode, lease quota, balance keys, and settle spend without
+            hiding what changed on the wire.
           </p>
           <div className="omn-home__actions">
-            <ActionLink href="./usage" label="Enter the docs" tone="primary" />
+            <ActionLink href="./usage" label="Open the docs" tone="primary" />
             <ActionLink
-              href="https://github.com/aiomni/omnillm"
-              label="Inspect the repo"
+              href="./architecture"
+              label="See the runtime path"
               tone="secondary"
             />
           </div>
@@ -189,22 +205,23 @@ export function LandingPage() {
 
         <aside className="omn-home__signal">
           <div className="omn-home__signal-head">
-            <span>Signal rail</span>
-            <span className="omn-home__signal-status">greenline</span>
+            <span>Dispatch board</span>
+            <span className="omn-home__signal-status">armed</span>
           </div>
           <h2 className="omn-home__signal-title">
-            One request path. Multiple providers. No hidden downgrade story.
+            Acquire, emit, stream, settle.
           </h2>
           <p className="omn-home__signal-copy">
-            The runtime acquires quota, reserves budget, emits transport,
-            streams or settles usage, then releases capacity through RAII.
+            The runtime keeps the path visible from key selection to usage
+            reconciliation, so transport decisions and budget movement never
+            disappear behind vendor clients.
           </p>
           <div className="omn-home__signal-rail">
             <div className="omn-home__rail-item">
               <span className="omn-home__rail-step">A1</span>
               <div className="omn-home__rail-copy">
                 <strong>Acquire a healthy key</strong>
-                <span>Randomized selection keeps contention moving.</span>
+                <span>Randomized scans keep contention moving.</span>
               </div>
             </div>
             <div className="omn-home__rail-item">
@@ -218,7 +235,7 @@ export function LandingPage() {
               <span className="omn-home__rail-step">C3</span>
               <div className="omn-home__rail-copy">
                 <strong>Dispatch and settle</strong>
-                <span>Actual usage reconciles state after completion.</span>
+                <span>Usage data closes the loop after completion.</span>
               </div>
             </div>
           </div>
@@ -229,6 +246,19 @@ export function LandingPage() {
             <span className="omn-home__protocol">Gemini</span>
           </div>
         </aside>
+      </section>
+
+      <section className="omn-home__provider-strip" aria-label="Mapped providers">
+        <span className="omn-home__provider-label">Mapped edges</span>
+        <div className="omn-home__provider-marquee">
+          <div className="omn-home__provider-track">
+            {[...providers, ...providers].map((provider, index) => (
+              <span className="omn-home__provider-chip" key={`${provider}-${index}`}>
+                {provider}
+              </span>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="omn-home__metrics" aria-label="Project metrics">
@@ -244,13 +274,13 @@ export function LandingPage() {
       <section className="omn-home__section">
         <div className="omn-home__section-head">
           <div>
-            <span className="omn-home__section-tag">Mission tracks</span>
-            <h2>Operate, bridge, and audit from the same surface.</h2>
+            <span className="omn-home__section-tag">Control blocks</span>
+            <h2>Route, bridge, and replay from the same hard-edged surface.</h2>
           </div>
           <p>
-            The front page borrows from product launch sites rather than default
-            doc portals. The tone is fast, sharp, and directional, but every
-            tile leads straight into concrete technical material.
+            The same runtime that ships requests also exposes the failure model:
+            compatibility boundaries, bridge semantics, and replay-safe traces
+            stay visible instead of being buried under SDK glue.
           </p>
         </div>
         <div className="omn-home__tracks">
@@ -263,13 +293,13 @@ export function LandingPage() {
       <section className="omn-home__section">
         <div className="omn-home__section-head">
           <div>
-            <span className="omn-home__section-tag">Control loop</span>
-            <h2>The execution path stays explicit from acquire to settle.</h2>
+            <span className="omn-home__section-tag">Runtime lanes</span>
+            <h2>The execution path stays in order from acquire to settle.</h2>
           </div>
           <p>
-            The same critical path that powers the crate is surfaced here as a
-            visible runway. It keeps the site grounded in the engineering model
-            instead of collapsing into generic marketing copy.
+            Key leases, budget pre-occupation, transport emission, and usage
+            settlement are not separate subsystems glued together later. They
+            are one control loop, surfaced here as one readable rail.
           </p>
         </div>
         <div className="omn-home__tracks">
@@ -282,13 +312,13 @@ export function LandingPage() {
       <section className="omn-home__section">
         <div className="omn-home__section-head">
           <div>
-            <span className="omn-home__section-tag">System feed</span>
-            <h2>Pick your altitude, then dive into the file-level detail.</h2>
+            <span className="omn-home__section-tag">Surface area</span>
+            <h2>Start broad, then drop straight into file-level material.</h2>
           </div>
           <p>
-            Use the launchpad as an operator view, then pivot into the guide,
-            architecture notes, or implementation walkthrough depending on how
-            close to the metal you need to get.
+            The homepage acts like a control surface. Once you have the shape of
+            the system, the guide, architecture notes, and implementation
+            walkthrough take you deeper without changing tools or context.
           </p>
         </div>
         <div className="omn-home__feed">
@@ -309,12 +339,12 @@ export function LandingPage() {
         <div className="omn-home__section-head">
           <div>
             <span className="omn-home__section-tag">Docs runway</span>
-            <h2>Three entry points. One documentation system.</h2>
+            <h2>Three entry points. One in-repo documentation system.</h2>
           </div>
           <p>
-            Existing Markdown stays the source of truth. Rspress turns it into
-            the public docs surface without forcing the Rust-focused docs to be
-            rewritten into a CMS format.
+            Markdown stays the source of truth. The public site now presents it
+            with a darker product-led front door without forcing the crate docs
+            to move into a CMS workflow.
           </p>
         </div>
         <div className="omn-home__docs">
@@ -325,17 +355,25 @@ export function LandingPage() {
       </section>
 
       <section className="omn-home__cta">
-        <span className="omn-home__section-tag">Ship it</span>
-        <h2>Deploy the site to GitHub Pages and keep the docs in-repo.</h2>
+        <span className="omn-home__section-tag">Ship from repo</span>
+        <h2>Keep the runtime and the docs in the same lane.</h2>
         <p>
-          The repository now includes a Pages workflow, a custom Rspress theme,
-          and a launch-style homepage tuned for OmniLLM instead of a generic
-          documentation template. Edit Markdown, push to main, and the public
-          site can update from the same source tree as the crate.
+          The repository already includes the Pages workflow, the custom theme,
+          and this new landing surface. Edit docs next to the Rust code, push,
+          and publish without switching systems or losing the engineering
+          context around the crate.
         </p>
         <div className="omn-home__cta-actions">
-          <ActionLink href="./implementation" label="Inspect internals" tone="primary" />
-          <ActionLink href="./usage#examples-included-in-this-repository" label="Run examples" tone="secondary" />
+          <ActionLink
+            href="./implementation"
+            label="Inspect internals"
+            tone="primary"
+          />
+          <ActionLink
+            href="https://github.com/aiomni/omnillm"
+            label="Inspect the repo"
+            tone="secondary"
+          />
         </div>
       </section>
     </div>
