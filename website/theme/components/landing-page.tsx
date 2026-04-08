@@ -332,8 +332,7 @@ export function LandingPage() {
           <div className="omn-home__signal">
             <span className="omn-home__section-kicker">AI-Native Runtime</span>
             <h2>
-              One crate and one bundled Skill for dispatch, bridge, quota
-              control, and replay-safe traces.
+              One crate and one bundled Skill for routing and quota control.
             </h2>
             <p>
               Canonical request types, loss-aware transcoding, and budget
