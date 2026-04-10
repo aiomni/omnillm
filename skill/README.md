@@ -21,47 +21,32 @@ Agent runtimes only require:
 The installer may also place `README.md` alongside those files and create a
 project-level `skills-lock.json`.
 
-The commands below use `--copy` so the installed skill stays self-contained in
+The commands below install directly from GitHub, so you do not need to clone
+the repository first.
+
+The commands also use `--copy` so the installed skill stays self-contained in
 the target agent directory.
-
-## Choose A Source
-
-From the repository root, you can confirm that the local checkout exposes the
-skill:
-
-```sh
-npx skills add . --list
-```
-
-If you are installing from GitHub instead of a local checkout, replace `.`
-with `https://github.com/aiomni/omnillm`.
 
 ## Claude Code
 
-From the repository root:
-
 ```sh
-npx skills add . --skill omnillm --agent claude-code --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent claude-code --copy
 ```
 
 Add `-g` if you want a user-level install.
 
 ## Codex
 
-From the repository root:
-
 ```sh
-npx skills add . --skill omnillm --agent codex --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent codex --copy
 ```
 
 Add `-g` if you want a user-level install.
 
 ## OpenCode
 
-From the repository root:
-
 ```sh
-npx skills add . --skill omnillm --agent opencode --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent opencode --copy
 ```
 
 Add `-g` if you want a user-level install.

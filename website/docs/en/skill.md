@@ -4,7 +4,7 @@ description: Install the OmniLLM Skill in Claude Code, Codex, or OpenCode with t
 label: skill guide
 release: v0.1.0
 updated: Apr 2026
-summary: Vercel Labs skills CLI commands, local-vs-GitHub sources, and verification across agent runtimes.
+summary: Vercel Labs skills CLI commands for GitHub-based installation and verification across agent runtimes.
 ---
 
 # Skill Guide
@@ -37,27 +37,16 @@ Agent runtimes only require:
 The installer may also add `README.md` next to the skill files and a
 project-level `skills-lock.json`.
 
+The commands below install directly from GitHub, so you do not need to clone
+the repository first.
+
 The commands below use `--copy` so the installed skill stays self-contained in
 the target agent directory.
-
-## Choose A Source
-
-From a local checkout, run the installer from the repository root:
-
-```sh
-npx skills add . --list
-```
-
-From anywhere else, use the GitHub repository directly:
-
-```sh
-npx skills add https://github.com/aiomni/omnillm --list
-```
 
 ## Claude Code
 
 ```sh
-npx skills add . --skill omnillm --agent claude-code --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent claude-code --copy
 ```
 
 Add `-g` for a user-level install.
@@ -65,7 +54,7 @@ Add `-g` for a user-level install.
 ## Codex
 
 ```sh
-npx skills add . --skill omnillm --agent codex --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent codex --copy
 ```
 
 Add `-g` for a user-level install.
@@ -73,13 +62,10 @@ Add `-g` for a user-level install.
 ## OpenCode
 
 ```sh
-npx skills add . --skill omnillm --agent opencode --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent opencode --copy
 ```
 
 Add `-g` for a user-level install.
-
-If you prefer installing straight from GitHub, replace `.` with
-`https://github.com/aiomni/omnillm` in any of the commands above.
 
 ## Verify Installation
 

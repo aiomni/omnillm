@@ -4,7 +4,7 @@ description: 通过 Vercel Labs skills 安装器把 OmniLLM Skill 安装到 Clau
 label: 技能指南
 release: v0.1.0
 updated: 2026 年 4 月
-summary: Vercel Labs skills CLI 命令、本地与 GitHub 源的安装方式，以及不同 agent 的验证方法。
+summary: 通过 GitHub 源安装 OmniLLM Skill 的 Vercel Labs skills CLI 命令，以及不同 agent 的验证方法。
 ---
 
 # 技能指南
@@ -36,27 +36,15 @@ OmniLLM 在仓库的
 安装器还可能额外写入 `README.md`，并在项目根目录生成
 `skills-lock.json`。
 
+下面的命令统一直接从 GitHub 安装，所以不需要先 clone 这个仓库。
+
 下面的命令统一带上 `--copy`，这样安装后的 skill 会保持为目标 agent
 目录中的一份独立副本。
-
-## 选择安装源
-
-如果你已经 clone 了这个仓库，请先在仓库根目录确认本地检出能被识别：
-
-```sh
-npx skills add . --list
-```
-
-如果你不在本地检出目录里，也可以直接使用 GitHub 仓库：
-
-```sh
-npx skills add https://github.com/aiomni/omnillm --list
-```
 
 ## Claude Code
 
 ```sh
-npx skills add . --skill omnillm --agent claude-code --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent claude-code --copy
 ```
 
 如果你希望安装到用户级位置，请追加 `-g`。
@@ -64,7 +52,7 @@ npx skills add . --skill omnillm --agent claude-code --copy
 ## Codex
 
 ```sh
-npx skills add . --skill omnillm --agent codex --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent codex --copy
 ```
 
 如果你希望安装到用户级位置，请追加 `-g`。
@@ -72,13 +60,10 @@ npx skills add . --skill omnillm --agent codex --copy
 ## OpenCode
 
 ```sh
-npx skills add . --skill omnillm --agent opencode --copy
+npx skills add https://github.com/aiomni/omnillm --skill omnillm --agent opencode --copy
 ```
 
 如果你希望安装到用户级位置，请追加 `-g`。
-
-如果你更想直接从 GitHub 安装，把上面命令里的 `.` 替换成
-`https://github.com/aiomni/omnillm` 即可。
 
 ## 验证安装
 
