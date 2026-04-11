@@ -21,7 +21,7 @@ surfaces instead of guessing from generic Rust or generic SDK patterns.
 The bundled Skill is tuned for repository-native signals such as:
 
 - `GatewayBuilder`, `Gateway`, `KeyConfig`, `PoolConfig`
-- `ProviderEndpoint`, `ProviderProtocol`, `LlmRequest`, `LlmStreamEvent`
+- `ProviderEndpoint`, `EndpointProtocol`, `ProviderProtocol`, `LlmRequest`, `LlmStreamEvent`
 - `ApiRequest`, `WireFormat`, `emit_transport_request`, `transcode_*`
 - `ReplayFixture`, `sanitize_transport_request`, `OMNILLM_RESPONSES_*`
 - runtime errors like `NoAvailableKey`, `BudgetExceeded`, and `Protocol(...)`
@@ -60,6 +60,7 @@ The documentation site source lives in the GitHub repository:
 ## Features
 
 - Canonical `Responses + Capability Layer` hybrid request/response model
+- Runtime endpoint profiles through `EndpointProtocol`, including official URL derivation and `*_compat` full-URL modes
 - Additive multi-endpoint API layer with canonical request/response types for generation, embeddings, images, audio, and rerank
 - Protocol-aware dispatch for OpenAI Responses, OpenAI Chat Completions, Claude Messages, and Gemini GenerateContent
 - Raw JSON and typed transcoders between supported protocols and endpoint families
@@ -135,6 +136,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Runtime Endpoint Profiles
+
+Runtime configuration uses `EndpointProtocol`, while `ProviderProtocol` remains
+the low-level wire-protocol enum for parsing, emission, and transcoding.
+Names such as `ClaudeMessages` and `GeminiGenerateContent` come directly from
+the upstream API families OmniLLM models, so treat them as wire-shape
+identifiers rather than preferred runtime configuration presets.
+
+```rust
+use omnillm::{AuthScheme, EndpointProtocol, ProviderEndpoint};
+
+let endpoint = ProviderEndpoint::new(
+    EndpointProtocol::OpenAiChatCompletionsCompat,
+    "https://your-openai-compatible-host/v1/chat/completions",
+)
+.with_auth(AuthScheme::Header {
+    name: "x-api-key".into(),
+});
+```
+
+Use official `EndpointProtocol` variants when OmniLLM should derive standard
+upstream paths from a host or prefix. Use `*_compat` variants when the upstream
+wrapper already exposes the full request URL.
 
 ## Protocol Transcoding
 

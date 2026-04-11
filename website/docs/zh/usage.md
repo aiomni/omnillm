@@ -84,7 +84,8 @@ OmniLLM 在仓库的
 - `LlmResponse` 是规范化的生成响应。
 - `LlmStreamEvent` 是规范化的流式事件模型。
 - `CapabilitySet` 用来承载跨 provider 的工具、结构化输出、推理、内置工具等能力。
-- `ProviderProtocol` 用于标识受支持的生成传输协议。
+- `EndpointProtocol` 表示运行时端点配置，包括 `*_compat` 模式。
+- `ProviderProtocol` 表示底层生成协议，供编解码与转码层使用。
 - `ProviderEndpoint` 用于标识请求要发送到哪里，以及如何发送。
 
 对于多端点场景：
@@ -197,17 +198,21 @@ let gateway = GatewayBuilder::new(ProviderEndpoint::claude_messages())
 你也可以自己构造一个自定义端点：
 
 ```rust
-use omnillm::{AuthScheme, ProviderEndpoint, ProviderProtocol};
+use omnillm::{AuthScheme, EndpointProtocol, ProviderEndpoint};
 
 let endpoint = ProviderEndpoint::new(
-    ProviderProtocol::OpenAiResponses,
-    "https://your-openai-compatible-host/v1",
+    EndpointProtocol::OpenAiResponsesCompat,
+    "https://your-openai-compatible-host/v1/responses",
 )
 .with_auth(AuthScheme::Header {
     name: "x-api-key".into(),
 })
 .with_default_header("x-tenant-id", "acme-prod");
 ```
+
+当 `base_url` 只是 host 或前缀时，使用非 `compat` 协议，让 OmniLLM 自动补齐标准路径。
+当 `base_url` 已经是某个包装层或兼容网关暴露出来的完整请求 URL 时，使用 `*_compat` 协议。
+`EndpointProtocol` 是运行时配置层；`ClaudeMessages`、`GeminiGenerateContent` 这类名字保留在 `ProviderProtocol` 上，因为它们对应的是上游 wire API 形态，供 `parse_*`、`emit_*`、`transcode_*` 使用。
 
 ### 鉴权方式
 
@@ -675,11 +680,11 @@ cargo run --example responses_live_demo
   不发起网络请求的前提下，展示类型化请求输出、协议转码、provider 注册表查询以及回放脱敏。
 
 - `responses_live_demo`
-  一个完全通过环境变量配置、支持图像输入的实时 Responses 示例请求。
+  一个完全通过环境变量配置、支持图像输入的实时运行时示例请求。
 
 ## 实时示例与实时测试
 
-仓库中附带了 `.env.example`，用于实时 Responses 示例以及被忽略的实时测试。
+仓库中附带了 `.env.example`，用于实时运行时示例以及被忽略的实时测试。
 
 典型流程：
 
@@ -699,7 +704,8 @@ cargo test responses_function_tool_demo -- --ignored --nocapture
 
 ### 1. OpenAI 兼容运行时 Gateway
 
-使用 `ProviderEndpoint::new(...)` 配合 `ProviderProtocol::OpenAiResponses` 或 `ProviderProtocol::OpenAiChatCompletions`，再按需要覆盖鉴权和请求头。
+运行时配置请使用 `ProviderEndpoint::new(...)` 配合 `EndpointProtocol`。
+当需要走标准上游路径时使用官方变体；当需要命中包装层自定义完整 URL 时使用 `*_compat` 变体。
 
 ### 2. 纯转换服务
 
@@ -745,7 +751,7 @@ cargo test responses_function_tool_demo -- --ignored --nocapture
 最常用的项目包括：
 
 - 运行时生成：
-  `Gateway`, `GatewayBuilder`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `ProviderProtocol`
+  `Gateway`, `GatewayBuilder`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `EndpointProtocol`
 
 - 规范化生成类型：
   `LlmRequest`, `LlmResponse`, `LlmStreamEvent`, `Message`, `RequestItem`, `CapabilitySet`

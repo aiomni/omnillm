@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use omnillm::{
-    AuthScheme, GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest, Message, MessageRole,
-    ProviderEndpoint, ProviderProtocol, RequestItem,
+    AuthScheme, EndpointProtocol, GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest,
+    Message, MessageRole, ProviderEndpoint, RequestItem,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -10,8 +10,9 @@ fn configured_endpoint() -> ProviderEndpoint {
     // Replace this with a built-in helper such as
     // `ProviderEndpoint::openai_responses()` when you do not need a custom host.
     ProviderEndpoint::new(
-        ProviderProtocol::OpenAiResponses,
-        std::env::var("OMNILLM_BASE_URL").expect("set OMNILLM_BASE_URL"),
+        EndpointProtocol::OpenAiResponsesCompat,
+        std::env::var("OMNILLM_BASE_URL")
+            .expect("set OMNILLM_BASE_URL to the full request URL for compat mode"),
     )
     .with_auth(AuthScheme::Bearer)
 }

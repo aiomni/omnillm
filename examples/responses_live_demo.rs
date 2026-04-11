@@ -1,4 +1,4 @@
-//! Generic live Responses demo.
+//! Generic live runtime gateway demo.
 //!
 //! Run with:
 //! ```sh
@@ -6,16 +6,29 @@
 //! ```
 
 use std::env;
+use std::io::{self, Write};
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use omnillm::{
-    AuthScheme, GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest, Message, MessagePart,
-    MessageRole, ProviderEndpoint, ProviderProtocol, RequestItem,
+    AuthScheme, EndpointProtocol, GatewayBuilder, GenerationConfig, KeyConfig, LlmRequest,
+    LlmStreamEvent, Message, MessagePart, MessageRole, ProviderEndpoint, RequestItem,
 };
 use tokio_util::sync::CancellationToken;
 
 fn required_env(name: &str) -> String {
     env::var(name).unwrap_or_else(|_| panic!("set {name} in the environment or .env"))
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+fn configured_protocol() -> EndpointProtocol {
+    env::var("OMNILLM_RESPONSES_PROTOCOL")
+        .unwrap_or_else(|_| "openai_responses".into())
+        .parse()
+        .unwrap_or_else(|error| panic!("{error}"))
 }
 
 fn configured_auth_scheme() -> AuthScheme {
@@ -37,20 +50,36 @@ fn configured_auth_scheme() -> AuthScheme {
     }
 }
 
+fn configured_stream() -> bool {
+    matches!(
+        env::var("OMNILLM_RESPONSES_STREAM")
+            .unwrap_or_else(|_| "false".into())
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+fn configured_max_output_tokens() -> Option<u32> {
+    optional_env("OMNILLM_RESPONSES_MAX_OUTPUT_TOKENS").map(|value| {
+        value.parse().unwrap_or_else(|_| {
+            panic!("OMNILLM_RESPONSES_MAX_OUTPUT_TOKENS must be a positive integer")
+        })
+    })
+}
+
 fn configured_endpoint() -> ProviderEndpoint {
     let mut endpoint = ProviderEndpoint::new(
-        ProviderProtocol::OpenAiResponses,
+        configured_protocol(),
         required_env("OMNILLM_RESPONSES_BASE_URL"),
     )
     .with_auth(configured_auth_scheme());
 
-    if let (Ok(name), Ok(value)) = (
-        env::var("OMNILLM_RESPONSES_EXTRA_HEADER_NAME"),
-        env::var("OMNILLM_RESPONSES_EXTRA_HEADER_VALUE"),
+    if let (Some(name), Some(value)) = (
+        optional_env("OMNILLM_RESPONSES_EXTRA_HEADER_NAME"),
+        optional_env("OMNILLM_RESPONSES_EXTRA_HEADER_VALUE"),
     ) {
-        if !name.is_empty() {
-            endpoint = endpoint.with_default_header(name, value);
-        }
+        endpoint = endpoint.with_default_header(name, value);
     }
 
     endpoint
@@ -88,16 +117,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })],
         messages: Vec::new(),
         capabilities: Default::default(),
-        generation: GenerationConfig::default(),
+        generation: GenerationConfig {
+            max_output_tokens: configured_max_output_tokens(),
+            ..Default::default()
+        },
         metadata: Default::default(),
         vendor_extensions: Default::default(),
     };
 
-    let response = gateway.call(request, CancellationToken::new()).await?;
+    if configured_stream() {
+        let mut stream = gateway.stream(request, CancellationToken::new()).await?;
+        let mut completed = None;
+        let mut saw_text = false;
 
-    println!("model: {}", response.model);
-    println!("usage: {}", response.usage.total());
-    println!("content:\n{}", response.content_text);
+        println!("content:");
+        while let Some(event) = stream.next().await {
+            match event? {
+                LlmStreamEvent::TextDelta { delta } => {
+                    print!("{delta}");
+                    io::stdout().flush()?;
+                    saw_text = true;
+                }
+                LlmStreamEvent::Completed { response } => completed = Some(response),
+                _ => {}
+            }
+        }
+
+        if saw_text {
+            println!();
+        }
+        if let Some(response) = completed {
+            println!("model: {}", response.model);
+            println!("usage: {}", response.usage.total());
+        }
+    } else {
+        let response = gateway.call(request, CancellationToken::new()).await?;
+
+        println!("model: {}", response.model);
+        println!("usage: {}", response.usage.total());
+        println!("content:\n{}", response.content_text);
+    }
 
     Ok(())
 }

@@ -40,23 +40,23 @@ impl Dispatcher {
         req: &LlmRequest,
     ) -> Result<LlmResponse, ApiError> {
         let url = self.provider_endpoint.request_url(&req.model, false);
-        let body = emit_request_with_mode(self.provider_endpoint.protocol, req, false)
-            .map_err(protocol_to_api)?;
+        let protocol = self.provider_endpoint.wire_protocol();
+        let body = emit_request_with_mode(protocol, req, false).map_err(protocol_to_api)?;
         let response = self
             .request_builder(&url, &lease.inner.key)
             .header("Content-Type", "application/json")
             .body(body)
             .send()
             .await
-            .map_err(|error| network_to_api(self.provider_endpoint.protocol, error))?;
+            .map_err(|error| network_to_api(protocol, error))?;
 
         let status = response.status();
         if status.is_success() {
             let text = response
                 .text()
                 .await
-                .map_err(|error| network_to_api(self.provider_endpoint.protocol, error))?;
-            parse_response(self.provider_endpoint.protocol, &text).map_err(protocol_to_api)
+                .map_err(|error| network_to_api(protocol, error))?;
+            parse_response(protocol, &text).map_err(protocol_to_api)
         } else {
             Err(self.classify_error(status, response).await)
         }
@@ -68,8 +68,8 @@ impl Dispatcher {
         req: &LlmRequest,
     ) -> Result<EventStream, ApiError> {
         let url = self.provider_endpoint.request_url(&req.model, true);
-        let body = emit_request_with_mode(self.provider_endpoint.protocol, req, true)
-            .map_err(protocol_to_api)?;
+        let protocol = self.provider_endpoint.wire_protocol();
+        let body = emit_request_with_mode(protocol, req, true).map_err(protocol_to_api)?;
         let response = self
             .request_builder(&url, &lease.inner.key)
             .header("Content-Type", "application/json")
@@ -77,14 +77,13 @@ impl Dispatcher {
             .body(body)
             .send()
             .await
-            .map_err(|error| network_to_api(self.provider_endpoint.protocol, error))?;
+            .map_err(|error| network_to_api(protocol, error))?;
 
         let status = response.status();
         if !status.is_success() {
             return Err(self.classify_error(status, response).await);
         }
 
-        let protocol = self.provider_endpoint.protocol;
         let stream = try_stream! {
             let mut buffer = String::new();
             let mut body_stream = response.bytes_stream();
@@ -120,7 +119,7 @@ impl Dispatcher {
     }
 
     pub(crate) fn protocol(&self) -> ProviderProtocol {
-        self.provider_endpoint.protocol
+        self.provider_endpoint.wire_protocol()
     }
 
     fn request_builder(&self, url: &str, api_key: &str) -> reqwest::RequestBuilder {
@@ -151,12 +150,12 @@ impl Dispatcher {
             429 => ApiError::RateLimited { retry_after },
             _ => ApiError::Provider(
                 parse_error(
-                    self.provider_endpoint.protocol,
+                    self.provider_endpoint.wire_protocol(),
                     Some(status.as_u16()),
                     &raw_body,
                 )
                 .unwrap_or_else(|_| ProviderError {
-                    protocol: self.provider_endpoint.protocol,
+                    protocol: self.provider_endpoint.wire_protocol(),
                     status: Some(status.as_u16()),
                     code: None,
                     message: raw_body,

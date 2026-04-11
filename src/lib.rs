@@ -79,8 +79,8 @@ pub use key::pool::KeyStatus;
 pub use protocol::{
     emit_error, emit_request, emit_response, emit_stream_event, parse_error, parse_request,
     parse_response, parse_stream_event, transcode_error, transcode_request, transcode_response,
-    transcode_stream_event, AuthScheme, ProtocolError, ProviderEndpoint, ProviderProtocol,
-    ProviderStreamFrame,
+    transcode_stream_event, AuthScheme, EndpointProtocol, ProtocolError, ProviderEndpoint,
+    ProviderProtocol, ProviderStreamFrame,
 };
 pub use provider_registry::{
     embedded_provider_registry, EndpointSupport, ProviderDescriptor, ProviderRegistry, SupportLevel,

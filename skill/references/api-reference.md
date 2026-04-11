@@ -27,6 +27,7 @@ Use the runtime gateway when you want to send live generation requests.
 - `KeyConfig`
 - `PoolConfig`
 - `ProviderEndpoint`
+- `EndpointProtocol`
 - `ProviderProtocol`
 
 ### Builder flow
@@ -145,17 +146,22 @@ Built-in generation endpoints:
 Custom or OpenAI-compatible hosts:
 
 ```rust
-use omnillm::{AuthScheme, ProviderEndpoint, ProviderProtocol};
+use omnillm::{AuthScheme, EndpointProtocol, ProviderEndpoint};
 
 let endpoint = ProviderEndpoint::new(
-    ProviderProtocol::OpenAiResponses,
-    "https://your-openai-compatible-host/v1",
+    EndpointProtocol::OpenAiResponsesCompat,
+    "https://your-openai-compatible-host/v1/responses",
 )
 .with_auth(AuthScheme::Header {
     name: "x-api-key".into(),
 })
 .with_default_header("x-tenant-id", "acme-prod");
 ```
+
+Use official `EndpointProtocol` variants when `base_url` is a host or prefix
+and OmniLLM should derive the standard path. Use `*_compat` variants when
+`base_url` is already the full request URL exposed by a wrapper or compatibility
+gateway.
 
 `AuthScheme` supports:
 
@@ -192,6 +198,10 @@ Supported generation protocol identifiers in the repo include:
 - `ProviderProtocol::OpenAiChatCompletions`
 - `ProviderProtocol::ClaudeMessages`
 - `ProviderProtocol::GeminiGenerateContent`
+
+These names come from the upstream API families OmniLLM models. Treat
+`ProviderProtocol` as the wire-level parse/emit/transcode surface and
+`EndpointProtocol` as the runtime endpoint configuration surface.
 
 When you bridge from a richer source protocol to a narrower target protocol,
 expect feature loss. For typed API work, use `ConversionReport<T>` to expose
@@ -323,19 +333,22 @@ Operational guidance:
 
 ## Live Demo Environment
 
-The repository's live Responses demo uses:
+The repository's live runtime demo uses:
 
 - `OMNILLM_RESPONSES_BASE_URL`
 - `OMNILLM_RESPONSES_API_KEY`
+- `OMNILLM_RESPONSES_PROTOCOL`
 - `OMNILLM_RESPONSES_AUTH_SCHEME`
 - `OMNILLM_RESPONSES_AUTH_NAME`
 - `OMNILLM_RESPONSES_EXTRA_HEADER_NAME`
 - `OMNILLM_RESPONSES_EXTRA_HEADER_VALUE`
+- `OMNILLM_RESPONSES_STREAM`
+- `OMNILLM_RESPONSES_MAX_OUTPUT_TOKENS`
 - `OMNILLM_RESPONSES_VISION_MODEL`
 - `OMNILLM_RESPONSES_TOOL_MODEL`
 - `OMNILLM_RESPONSES_IMAGE_URL`
 - `OMNILLM_RESPONSES_VISION_PROMPT`
 - `OMNILLM_RESPONSES_TOOL_PROMPT`
 
-If you see these names in code or docs, use the live Responses configuration
+If you see these names in code or docs, use the live runtime configuration
 flow instead of hardcoding provider settings.

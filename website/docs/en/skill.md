@@ -13,7 +13,7 @@ OmniLLM ships with a first-party agent skill in the repository's
 [`skill/` directory](https://github.com/aiomni/omnillm/tree/main/skill). The
 skill teaches agents the crate's real boundaries:
 
-- runtime generation through `Gateway`
+- runtime generation through `Gateway`, `ProviderEndpoint`, and `EndpointProtocol`
 - protocol parsing, emission, and transcoding through `parse_*`, `emit_*`, and `transcode_*`
 - typed multi-endpoint conversion through `ApiRequest`, `ApiResponse`, and `WireFormat`
 - replay fixture sanitization through `ReplayFixture` and `sanitize_*`
@@ -82,6 +82,7 @@ Then start a new session in your chosen agent and ask for something
 OmniLLM-specific, for example:
 
 - scaffold a `GatewayBuilder` flow with `ProviderEndpoint` and `KeyConfig`
+- configure an `EndpointProtocol::*_compat` runtime endpoint for an OpenAI-compatible wrapper
 - explain when `Gateway` is correct versus `transcode_*`
 - debug `NoAvailableKey`, `BudgetExceeded`, or `Protocol(...)`
 - emit an `ApiRequest` into a provider wire format

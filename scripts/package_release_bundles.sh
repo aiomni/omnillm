@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root_dir="$(
+  CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null
+  pwd
+)"
 dist_dir="${DIST_DIR:-$root_dir/dist}"
 
 crate_name="$(sed -n 's/^name *= *"\([^"]*\)".*/\1/p' "$root_dir/Cargo.toml" | head -n 1)"

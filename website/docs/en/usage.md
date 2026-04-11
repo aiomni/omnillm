@@ -87,7 +87,8 @@ The crate normalizes generation around `LlmRequest` and `LlmResponse`.
 - `LlmResponse` is the canonical generation response.
 - `LlmStreamEvent` is the canonical stream event model.
 - `CapabilitySet` holds cross-provider features like tools, structured output, reasoning, and builtin tools.
-- `ProviderProtocol` identifies a supported generation wire protocol.
+- `EndpointProtocol` identifies a runtime endpoint profile, including `*_compat` modes.
+- `ProviderProtocol` identifies a low-level generation wire protocol used by codecs and transcoding.
 - `ProviderEndpoint` identifies where and how to send a request.
 
 For multi-endpoint work:
@@ -200,17 +201,21 @@ Built-in generation endpoints:
 You can also construct a custom endpoint:
 
 ```rust
-use omnillm::{AuthScheme, ProviderEndpoint, ProviderProtocol};
+use omnillm::{AuthScheme, EndpointProtocol, ProviderEndpoint};
 
 let endpoint = ProviderEndpoint::new(
-    ProviderProtocol::OpenAiResponses,
-    "https://your-openai-compatible-host/v1",
+    EndpointProtocol::OpenAiResponsesCompat,
+    "https://your-openai-compatible-host/v1/responses",
 )
 .with_auth(AuthScheme::Header {
     name: "x-api-key".into(),
 })
 .with_default_header("x-tenant-id", "acme-prod");
 ```
+
+Use a non-`compat` protocol when `base_url` is a host or prefix and OmniLLM should derive the standard path.
+Use a `*_compat` protocol when `base_url` is already the full request URL exposed by a wrapper or OpenAI-compatible gateway.
+`EndpointProtocol` is the runtime configuration surface; names such as `ClaudeMessages` and `GeminiGenerateContent` live on `ProviderProtocol` because they mirror upstream wire APIs used by the parse, emit, and transcode helpers.
 
 ### Authentication Modes
 
@@ -678,11 +683,11 @@ What each one shows:
   Typed request emission, transcoding, provider registry lookup, and replay sanitization without making network calls.
 
 - `responses_live_demo`
-  A live image-capable Responses request configured entirely from environment variables.
+  A live image-capable runtime request configured entirely from environment variables.
 
 ## Live Demo and Live Tests
 
-The repository includes `.env.example` for the live Responses demo and ignored live tests.
+The repository includes `.env.example` for the live runtime demo and ignored live tests.
 
 Typical flow:
 
@@ -702,7 +707,8 @@ cargo test responses_function_tool_demo -- --ignored --nocapture
 
 ### 1. OpenAI-compatible Runtime Gateway
 
-Use `ProviderEndpoint::new(...)` with `ProviderProtocol::OpenAiResponses` or `ProviderProtocol::OpenAiChatCompletions`, then override auth and headers as needed.
+Use `ProviderEndpoint::new(...)` with `EndpointProtocol` for runtime configuration.
+Use official variants when OmniLLM should derive standard upstream paths, and `*_compat` variants when you need to hit a wrapper-specific full URL while reusing the same wire protocol.
 
 ### 2. Conversion-Only Service
 
@@ -748,7 +754,7 @@ This is expected for some upstream streaming shapes. The gateway falls back to p
 The most commonly used items are:
 
 - runtime generation:
-  `Gateway`, `GatewayBuilder`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `ProviderProtocol`
+  `Gateway`, `GatewayBuilder`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `EndpointProtocol`
 
 - canonical generation types:
   `LlmRequest`, `LlmResponse`, `LlmStreamEvent`, `Message`, `RequestItem`, `CapabilitySet`

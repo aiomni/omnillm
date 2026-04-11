@@ -1,14 +1,26 @@
 use std::env;
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use omnillm::{
-    AuthScheme, CapabilitySet, GatewayBuilder, KeyConfig, LlmRequest, Message, MessagePart,
-    MessageRole, ProviderEndpoint, ProviderProtocol, RequestItem, ResponseItem, ToolDefinition,
+    AuthScheme, CapabilitySet, EndpointProtocol, GatewayBuilder, KeyConfig, LlmRequest, Message,
+    MessagePart, MessageRole, ProviderEndpoint, RequestItem, ResponseItem, ToolDefinition,
 };
 use tokio_util::sync::CancellationToken;
 
 fn required_env(name: &str) -> String {
     env::var(name).unwrap_or_else(|_| panic!("set {name} in the environment or .env"))
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+fn configured_protocol() -> EndpointProtocol {
+    env::var("OMNILLM_RESPONSES_PROTOCOL")
+        .unwrap_or_else(|_| "openai_responses".into())
+        .parse()
+        .unwrap_or_else(|error| panic!("{error}"))
 }
 
 fn configured_auth_scheme() -> AuthScheme {
@@ -30,22 +42,38 @@ fn configured_auth_scheme() -> AuthScheme {
     }
 }
 
+fn configured_stream() -> bool {
+    matches!(
+        env::var("OMNILLM_RESPONSES_STREAM")
+            .unwrap_or_else(|_| "false".into())
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+fn configured_max_output_tokens() -> Option<u32> {
+    optional_env("OMNILLM_RESPONSES_MAX_OUTPUT_TOKENS").map(|value| {
+        value.parse().unwrap_or_else(|_| {
+            panic!("OMNILLM_RESPONSES_MAX_OUTPUT_TOKENS must be a positive integer")
+        })
+    })
+}
+
 fn live_gateway() -> omnillm::Gateway {
     dotenvy::dotenv().ok();
 
     let mut endpoint = ProviderEndpoint::new(
-        ProviderProtocol::OpenAiResponses,
+        configured_protocol(),
         required_env("OMNILLM_RESPONSES_BASE_URL"),
     )
     .with_auth(configured_auth_scheme());
 
-    if let (Ok(name), Ok(value)) = (
-        env::var("OMNILLM_RESPONSES_EXTRA_HEADER_NAME"),
-        env::var("OMNILLM_RESPONSES_EXTRA_HEADER_VALUE"),
+    if let (Some(name), Some(value)) = (
+        optional_env("OMNILLM_RESPONSES_EXTRA_HEADER_NAME"),
+        optional_env("OMNILLM_RESPONSES_EXTRA_HEADER_VALUE"),
     ) {
-        if !name.is_empty() {
-            endpoint = endpoint.with_default_header(name, value);
-        }
+        endpoint = endpoint.with_default_header(name, value);
     }
 
     GatewayBuilder::new(endpoint)
@@ -59,7 +87,7 @@ fn live_gateway() -> omnillm::Gateway {
 }
 
 #[tokio::test]
-#[ignore = "live generic Responses call; run explicitly with OMNILLM_RESPONSES_* configured"]
+#[ignore = "live generic runtime call; run explicitly with OMNILLM_RESPONSES_* configured"]
 async fn responses_vision_demo() {
     let gateway = live_gateway();
 
@@ -83,24 +111,54 @@ async fn responses_vision_demo() {
         })],
         messages: Vec::new(),
         capabilities: Default::default(),
-        generation: Default::default(),
+        generation: omnillm::GenerationConfig {
+            max_output_tokens: configured_max_output_tokens(),
+            ..Default::default()
+        },
         metadata: Default::default(),
         vendor_extensions: Default::default(),
     };
 
-    let response = gateway
-        .call(request, CancellationToken::new())
-        .await
-        .expect("live request should succeed");
+    if configured_stream() {
+        let mut stream = gateway
+            .stream(request, CancellationToken::new())
+            .await
+            .expect("live stream should start");
+        let mut content = String::new();
+        let mut completed_content = None;
 
-    assert!(
-        !response.content_text.trim().is_empty(),
-        "expected non-empty content"
-    );
+        while let Some(event) = stream.next().await {
+            match event.expect("stream event should parse") {
+                omnillm::LlmStreamEvent::TextDelta { delta } => content.push_str(&delta),
+                omnillm::LlmStreamEvent::Completed { response } => {
+                    completed_content = Some(response.content_text)
+                }
+                _ => {}
+            }
+        }
+
+        assert!(
+            !content.trim().is_empty()
+                || completed_content
+                    .as_deref()
+                    .is_some_and(|text| !text.trim().is_empty()),
+            "expected streamed content"
+        );
+    } else {
+        let response = gateway
+            .call(request, CancellationToken::new())
+            .await
+            .expect("live request should succeed");
+
+        assert!(
+            !response.content_text.trim().is_empty(),
+            "expected non-empty content"
+        );
+    }
 }
 
 #[tokio::test]
-#[ignore = "live generic Responses call; run explicitly with OMNILLM_RESPONSES_* configured"]
+#[ignore = "live generic runtime call; run explicitly with OMNILLM_RESPONSES_* configured"]
 async fn responses_function_tool_demo() {
     let gateway = live_gateway();
 
@@ -136,7 +194,10 @@ async fn responses_function_tool_demo() {
             }],
             ..Default::default()
         },
-        generation: Default::default(),
+        generation: omnillm::GenerationConfig {
+            max_output_tokens: configured_max_output_tokens(),
+            ..Default::default()
+        },
         metadata: Default::default(),
         vendor_extensions: Default::default(),
     };

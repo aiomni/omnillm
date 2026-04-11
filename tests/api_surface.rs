@@ -33,10 +33,9 @@ fn public_api_emits_embedding_transport_request() {
 fn public_registry_exposes_supported_formats() {
     let registry = embedded_provider_registry();
 
-    assert!(registry.supports_wire_format(
-        omnillm::ProviderKind::OpenAi,
-        WireFormat::OpenAiResponses
-    ));
+    assert!(
+        registry.supports_wire_format(omnillm::ProviderKind::OpenAi, WireFormat::OpenAiResponses)
+    );
     assert!(!registry.supports_endpoint(
         omnillm::ProviderKind::Bedrock,
         omnillm::EndpointKind::Messages

@@ -1,6 +1,7 @@
 //! Provider protocol definitions and canonical/raw conversion helpers.
 
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -14,7 +15,12 @@ use crate::types::{
     ToolResultPart, VendorExtensions,
 };
 
-/// Supported upstream wire protocols.
+/// Low-level upstream generation wire protocols used by the codec/transcoder
+/// layer.
+///
+/// These names follow upstream endpoint families, not runtime configuration
+/// presets. For example, `ClaudeMessages` refers to Anthropic's `/messages`
+/// API, and `GeminiGenerateContent` refers to Gemini's `generateContent` API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderProtocol {
@@ -22,6 +28,94 @@ pub enum ProviderProtocol {
     OpenAiChatCompletions,
     ClaudeMessages,
     GeminiGenerateContent,
+}
+
+/// Runtime endpoint profiles used by [`ProviderEndpoint`].
+///
+/// Official variants derive request URLs from a base host/prefix. `Compat`
+/// variants reuse the same wire protocol against a non-standard endpoint and
+/// treat `base_url` as the final request URL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointProtocol {
+    OpenAiResponses,
+    OpenAiChatCompletions,
+    ClaudeMessages,
+    GeminiGenerateContent,
+    OpenAiResponsesCompat,
+    OpenAiChatCompletionsCompat,
+    ClaudeMessagesCompat,
+    GeminiGenerateContentCompat,
+}
+
+impl EndpointProtocol {
+    pub fn wire_protocol(self) -> ProviderProtocol {
+        match self {
+            Self::OpenAiResponses | Self::OpenAiResponsesCompat => {
+                ProviderProtocol::OpenAiResponses
+            }
+            Self::OpenAiChatCompletions | Self::OpenAiChatCompletionsCompat => {
+                ProviderProtocol::OpenAiChatCompletions
+            }
+            Self::ClaudeMessages | Self::ClaudeMessagesCompat => ProviderProtocol::ClaudeMessages,
+            Self::GeminiGenerateContent | Self::GeminiGenerateContentCompat => {
+                ProviderProtocol::GeminiGenerateContent
+            }
+        }
+    }
+
+    pub fn is_compat(self) -> bool {
+        matches!(
+            self,
+            Self::OpenAiResponsesCompat
+                | Self::OpenAiChatCompletionsCompat
+                | Self::ClaudeMessagesCompat
+                | Self::GeminiGenerateContentCompat
+        )
+    }
+}
+
+impl From<ProviderProtocol> for EndpointProtocol {
+    fn from(value: ProviderProtocol) -> Self {
+        match value {
+            ProviderProtocol::OpenAiResponses => Self::OpenAiResponses,
+            ProviderProtocol::OpenAiChatCompletions => Self::OpenAiChatCompletions,
+            ProviderProtocol::ClaudeMessages => Self::ClaudeMessages,
+            ProviderProtocol::GeminiGenerateContent => Self::GeminiGenerateContent,
+        }
+    }
+}
+
+impl FromStr for EndpointProtocol {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let normalized = value.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "responses" | "openai_responses" | "open_ai_responses" => Ok(Self::OpenAiResponses),
+            "chat_completions" | "openai_chat_completions" | "open_ai_chat_completions" => {
+                Ok(Self::OpenAiChatCompletions)
+            }
+            "claude_messages" | "anthropic_messages" => Ok(Self::ClaudeMessages),
+            "gemini_generate_content" => Ok(Self::GeminiGenerateContent),
+            "responses_compat" | "openai_responses_compat" | "open_ai_responses_compat" => {
+                Ok(Self::OpenAiResponsesCompat)
+            }
+            "chat_completions_compat"
+            | "openai_chat_completions_compat"
+            | "open_ai_chat_completions_compat" => Ok(Self::OpenAiChatCompletionsCompat),
+            "claude_messages_compat" | "anthropic_messages_compat" => {
+                Ok(Self::ClaudeMessagesCompat)
+            }
+            "gemini_generate_content_compat" => Ok(Self::GeminiGenerateContentCompat),
+            _ => Err(format!(
+                "unsupported endpoint protocol `{value}`; expected one of: \
+openai_responses, openai_chat_completions, claude_messages, gemini_generate_content, \
+openai_responses_compat, openai_chat_completions_compat, claude_messages_compat, \
+gemini_generate_content_compat"
+            )),
+        }
+    }
 }
 
 /// Authentication strategy for an upstream provider.
@@ -34,8 +128,8 @@ pub enum AuthScheme {
 }
 
 impl AuthScheme {
-    pub fn default_for(protocol: ProviderProtocol) -> Self {
-        match protocol {
+    pub fn default_for(protocol: EndpointProtocol) -> Self {
+        match protocol.wire_protocol() {
             ProviderProtocol::OpenAiResponses | ProviderProtocol::OpenAiChatCompletions => {
                 Self::Bearer
             }
@@ -52,7 +146,7 @@ impl AuthScheme {
 /// Target provider configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderEndpoint {
-    pub protocol: ProviderProtocol,
+    pub protocol: EndpointProtocol,
     pub base_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<AuthScheme>,
@@ -61,7 +155,8 @@ pub struct ProviderEndpoint {
 }
 
 impl ProviderEndpoint {
-    pub fn new(protocol: ProviderProtocol, base_url: impl Into<String>) -> Self {
+    pub fn new(protocol: impl Into<EndpointProtocol>, base_url: impl Into<String>) -> Self {
+        let protocol = protocol.into();
         let mut endpoint = Self {
             protocol,
             base_url: base_url.into(),
@@ -69,7 +164,7 @@ impl ProviderEndpoint {
             default_headers: BTreeMap::new(),
         };
 
-        if matches!(protocol, ProviderProtocol::ClaudeMessages) {
+        if matches!(protocol.wire_protocol(), ProviderProtocol::ClaudeMessages) {
             endpoint
                 .default_headers
                 .insert("anthropic-version".into(), "2023-06-01".into());
@@ -80,35 +175,46 @@ impl ProviderEndpoint {
 
     pub fn openai_responses() -> Self {
         Self::new(
-            ProviderProtocol::OpenAiResponses,
+            EndpointProtocol::OpenAiResponses,
             "https://api.openai.com/v1",
         )
     }
 
     pub fn openai_chat_completions() -> Self {
         Self::new(
-            ProviderProtocol::OpenAiChatCompletions,
+            EndpointProtocol::OpenAiChatCompletions,
             "https://api.openai.com/v1",
         )
     }
 
     pub fn claude_messages() -> Self {
         Self::new(
-            ProviderProtocol::ClaudeMessages,
+            EndpointProtocol::ClaudeMessages,
             "https://api.anthropic.com/v1",
         )
     }
 
     pub fn gemini_generate_content() -> Self {
         Self::new(
-            ProviderProtocol::GeminiGenerateContent,
+            EndpointProtocol::GeminiGenerateContent,
             "https://generativelanguage.googleapis.com",
         )
     }
 
-    pub fn with_auth(mut self, auth: AuthScheme) -> Self {
-        self.auth = Some(auth);
-        self
+    pub fn openai_responses_compat(base_url: impl Into<String>) -> Self {
+        Self::new(EndpointProtocol::OpenAiResponsesCompat, base_url)
+    }
+
+    pub fn openai_chat_completions_compat(base_url: impl Into<String>) -> Self {
+        Self::new(EndpointProtocol::OpenAiChatCompletionsCompat, base_url)
+    }
+
+    pub fn claude_messages_compat(base_url: impl Into<String>) -> Self {
+        Self::new(EndpointProtocol::ClaudeMessagesCompat, base_url)
+    }
+
+    pub fn gemini_generate_content_compat(base_url: impl Into<String>) -> Self {
+        Self::new(EndpointProtocol::GeminiGenerateContentCompat, base_url)
     }
 
     pub fn with_default_header(
@@ -120,15 +226,28 @@ impl ProviderEndpoint {
         self
     }
 
+    pub fn with_auth(mut self, auth: AuthScheme) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
     pub fn auth_scheme(&self) -> AuthScheme {
         self.auth
             .clone()
             .unwrap_or_else(|| AuthScheme::default_for(self.protocol))
     }
 
+    pub fn wire_protocol(&self) -> ProviderProtocol {
+        self.protocol.wire_protocol()
+    }
+
     pub(crate) fn request_url(&self, model: &str, stream: bool) -> String {
+        if self.protocol.is_compat() {
+            return self.base_url.trim().to_string();
+        }
+
         let base = self.base_url.trim_end_matches('/');
-        match self.protocol {
+        match self.protocol.wire_protocol() {
             ProviderProtocol::OpenAiResponses => {
                 if base.ends_with("/responses") {
                     base.to_string()
@@ -3198,6 +3317,58 @@ fn request_items_for_instructionless_protocol(request: &LlmRequest) -> Vec<Reque
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn endpoint_protocol_parses_official_and_compat_aliases() {
+        assert_eq!(
+            "openai_chat_completions"
+                .parse::<EndpointProtocol>()
+                .expect("official parse"),
+            EndpointProtocol::OpenAiChatCompletions
+        );
+        assert_eq!(
+            "open_ai_chat_completions_compat"
+                .parse::<EndpointProtocol>()
+                .expect("compat parse"),
+            EndpointProtocol::OpenAiChatCompletionsCompat
+        );
+        assert_eq!(
+            "anthropic_messages"
+                .parse::<EndpointProtocol>()
+                .expect("anthropic alias"),
+            EndpointProtocol::ClaudeMessages
+        );
+    }
+
+    #[test]
+    fn provider_endpoint_uses_compat_base_url_as_final_request_url() {
+        let endpoint = ProviderEndpoint::new(
+            EndpointProtocol::OpenAiChatCompletionsCompat,
+            "https://aidp.bytedance.net/api/modelhub/online/v2/crawl",
+        );
+
+        assert_eq!(
+            endpoint.request_url("openai_qwen3.6-plus", true),
+            "https://aidp.bytedance.net/api/modelhub/online/v2/crawl",
+        );
+        assert_eq!(
+            endpoint.wire_protocol(),
+            ProviderProtocol::OpenAiChatCompletions
+        );
+    }
+
+    #[test]
+    fn provider_endpoint_keeps_official_path_derivation() {
+        let endpoint = ProviderEndpoint::new(
+            EndpointProtocol::OpenAiChatCompletions,
+            "https://api.openai.com/v1",
+        );
+
+        assert_eq!(
+            endpoint.request_url("gpt-4.1-mini", false),
+            "https://api.openai.com/v1/chat/completions"
+        );
+    }
 
     #[test]
     fn transcode_chat_request_to_responses_request() {

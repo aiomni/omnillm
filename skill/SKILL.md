@@ -7,10 +7,11 @@ description: |
   generation client, per-key RPM/TPM limiting, circuit breaking, budget tracking,
   protocol conversion, typed endpoint emission/transcoding, or replay fixture
   sanitization. Trigger on code or questions containing `GatewayBuilder`,
-  `Gateway`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `ProviderProtocol`,
-  `LlmRequest`, `LlmResponse`, `LlmStreamEvent`, `CapabilitySet`, `ApiRequest`,
-  `ApiResponse`, `WireFormat`, `emit_transport_request`, `parse_*`, `emit_*`,
-  `transcode_*`, `ReplayFixture`, or env vars like `OMNILLM_RESPONSES_*`.
+  `Gateway`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `EndpointProtocol`,
+  `ProviderProtocol`, `LlmRequest`, `LlmResponse`, `LlmStreamEvent`,
+  `CapabilitySet`, `ApiRequest`, `ApiResponse`, `WireFormat`,
+  `emit_transport_request`, `parse_*`, `emit_*`, `transcode_*`,
+  `ReplayFixture`, or env vars like `OMNILLM_RESPONSES_*`.
   Also use this skill for Chinese requests about "多 key 负载均衡", "限流",
   "协议转换", "预算追踪", or errors like `NoAvailableKey`, `BudgetExceeded`,
   `RateLimited`, `Unauthorized`, and `Protocol(...)`.
@@ -38,8 +39,8 @@ surfaces:
 Before writing code, place the request into exactly one primary lane:
 
 1. Runtime generation
-   Use `GatewayBuilder`, `ProviderEndpoint`, `KeyConfig`, `LlmRequest`,
-   `Gateway::call`, and `Gateway::stream`.
+   Use `GatewayBuilder`, `ProviderEndpoint`, `EndpointProtocol`, `KeyConfig`,
+   `LlmRequest`, `Gateway::call`, and `Gateway::stream`.
 
 2. Generation protocol parsing or transcoding
    Use `parse_*`, `emit_*`, `transcode_*`, `ProviderProtocol`, and raw JSON
@@ -57,6 +58,7 @@ If the user is unsure, infer the lane from code already present in the repo:
 
 - `GatewayBuilder`, `LlmRequest`, `Message`, `RequestItem` usually means runtime
   generation
+- `EndpointProtocol` usually means runtime endpoint configuration
 - `ProviderProtocol`, `transcode_request`, `emit_request` usually means
   generation protocol work
 - `ApiRequest`, `WireFormat`, `emit_transport_request` usually means typed
@@ -122,11 +124,11 @@ For built-in generation endpoints, prefer:
 For OpenAI-compatible or custom hosts, construct the endpoint explicitly:
 
 ```rust
-use omnillm::{AuthScheme, ProviderEndpoint, ProviderProtocol};
+use omnillm::{AuthScheme, EndpointProtocol, ProviderEndpoint};
 
 let endpoint = ProviderEndpoint::new(
-    ProviderProtocol::OpenAiResponses,
-    "https://your-openai-compatible-host/v1",
+    EndpointProtocol::OpenAiResponsesCompat,
+    "https://your-openai-compatible-host/v1/responses",
 )
 .with_auth(AuthScheme::Header {
     name: "x-api-key".into(),
@@ -134,7 +136,15 @@ let endpoint = ProviderEndpoint::new(
 .with_default_header("x-tenant-id", "acme-prod");
 ```
 
-Only override auth if the upstream actually needs it.
+Use official `EndpointProtocol` variants when OmniLLM should derive the
+standard upstream path from a host or prefix. Use `*_compat` variants when the
+upstream already exposes the full request URL.
+
+Only override auth if the upstream actually needs it. Keep `ProviderProtocol`
+for `parse_*`, `emit_*`, and `transcode_*` work.
+Names such as `ClaudeMessages` and `GeminiGenerateContent` belong there because
+they mirror upstream wire APIs, not because they are the preferred runtime
+configuration surface.
 
 ### 4. Make runtime behavior visible
 
@@ -172,6 +182,7 @@ Use:
 - `KeyConfig`
 - `PoolConfig`
 - `ProviderEndpoint`
+- `EndpointProtocol`
 - `LlmRequest`
 - `Gateway::call`
 - `Gateway::stream`
@@ -274,12 +285,13 @@ If the repo or user mentions:
 - `.env.example`
 - `OMNILLM_RESPONSES_BASE_URL`
 - `OMNILLM_RESPONSES_API_KEY`
+- `OMNILLM_RESPONSES_PROTOCOL`
 - `OMNILLM_RESPONSES_AUTH_SCHEME`
 - `OMNILLM_RESPONSES_IMAGE_URL`
 
-they are likely following the live Responses demo flow. Use
-`ProviderEndpoint::new(...)` plus `AuthScheme` and keep configuration in
-environment variables.
+they are likely following the live runtime demo flow. Parse
+`OMNILLM_RESPONSES_PROTOCOL` as `EndpointProtocol`, use `ProviderEndpoint::new(...)`
+plus `AuthScheme`, and keep provider configuration in environment variables.
 
 ## Output Style
 

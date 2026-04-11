@@ -13,7 +13,7 @@ OmniLLM 在仓库的
 [`skill/` 目录](https://github.com/aiomni/omnillm/tree/main/skill)
 中提供了一份官方智能体技能。它会把这个库的真实边界教给各类智能体：
 
-- 通过 `Gateway` 进行运行时生成调用
+- 通过 `Gateway`、`ProviderEndpoint` 与 `EndpointProtocol` 进行运行时生成调用
 - 通过 `parse_*`、`emit_*` 与 `transcode_*` 完成协议解析、输出和转码
 - 通过 `ApiRequest`、`ApiResponse` 与 `WireFormat` 完成类型化多端点转换
 - 通过 `ReplayFixture` 与 `sanitize_*` 完成回放夹具脱敏
@@ -78,6 +78,7 @@ npx skills ls -a codex --json
 然后在你选择的智能体中开启一个新会话，并提出一个 OmniLLM 相关的问题，例如：
 
 - 用 `ProviderEndpoint` 和 `KeyConfig` 搭一个 `GatewayBuilder` 流程
+- 给某个 OpenAI 兼容包装层配置 `EndpointProtocol::*_compat` 运行时端点
 - 解释什么时候应该使用 `Gateway`，什么时候应该直接用 `transcode_*`
 - 排查 `NoAvailableKey`、`BudgetExceeded` 或 `Protocol(...)`
 - 把一个 `ApiRequest` 输出成 provider 的传输格式
