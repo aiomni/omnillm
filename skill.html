@@ -8,7 +8,7 @@
 <script defer src="/omnillm/static/js/lib-react.29ba226733.js"></script>
 <script defer src="/omnillm/static/js/lib-router.eac1a3a449.js"></script>
 <script defer src="/omnillm/static/js/59.b929cbaf25.js"></script>
-<script defer src="/omnillm/static/js/index.0d65544e1e.js"></script>
+<script defer src="/omnillm/static/js/index.c5552bec69.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.8">
 <link rel="icon" href="/omnillm/favicon.svg" type="image/svg+xml">
@@ -23,7 +23,7 @@
 <a href="https://github.com/aiomni/omnillm/tree/main/skill" target="_blank" rel="noopener noreferrer" class="rp-link"><code>skill/</code> directory</a>. The
 skill teaches agents the crate&#x27;s real boundaries:</p>
 <ul>
-<li>runtime generation through <code>Gateway</code></li>
+<li>runtime generation through <code>Gateway</code>, <code>ProviderEndpoint</code>, and <code>EndpointProtocol</code></li>
 <li>protocol parsing, emission, and transcoding through <code>parse_*</code>, <code>emit_*</code>, and <code>transcode_*</code></li>
 <li>typed multi-endpoint conversion through <code>ApiRequest</code>, <code>ApiResponse</code>, and <code>WireFormat</code></li>
 <li>replay fixture sanitization through <code>ReplayFixture</code> and <code>sanitize_*</code></li>
@@ -64,6 +64,7 @@ about:</p>
 OmniLLM-specific, for example:</p>
 <ul>
 <li>scaffold a <code>GatewayBuilder</code> flow with <code>ProviderEndpoint</code> and <code>KeyConfig</code></li>
+<li>configure an <code>EndpointProtocol::*_compat</code> runtime endpoint for an OpenAI-compatible wrapper</li>
 <li>explain when <code>Gateway</code> is correct versus <code>transcode_*</code></li>
 <li>debug <code>NoAvailableKey</code>, <code>BudgetExceeded</code>, or <code>Protocol(...)</code></li>
 <li>emit an <code>ApiRequest</code> into a provider wire format</li>

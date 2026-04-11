@@ -8,7 +8,7 @@
 <script defer src="/omnillm/static/js/lib-react.29ba226733.js"></script>
 <script defer src="/omnillm/static/js/lib-router.eac1a3a449.js"></script>
 <script defer src="/omnillm/static/js/59.b929cbaf25.js"></script>
-<script defer src="/omnillm/static/js/index.0d65544e1e.js"></script>
+<script defer src="/omnillm/static/js/index.c5552bec69.js"></script>
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="generator" content="Rspress v2.0.8">
 <link rel="icon" href="/omnillm/favicon.svg" type="image/svg+xml">
@@ -23,7 +23,7 @@
 <a href="https://github.com/aiomni/omnillm/tree/main/skill" target="_blank" rel="noopener noreferrer" class="rp-link"><code>skill/</code> 目录</a>
 中提供了一份官方智能体技能。它会把这个库的真实边界教给各类智能体：</p>
 <ul>
-<li>通过 <code>Gateway</code> 进行运行时生成调用</li>
+<li>通过 <code>Gateway</code>、<code>ProviderEndpoint</code> 与 <code>EndpointProtocol</code> 进行运行时生成调用</li>
 <li>通过 <code>parse_*</code>、<code>emit_*</code> 与 <code>transcode_*</code> 完成协议解析、输出和转码</li>
 <li>通过 <code>ApiRequest</code>、<code>ApiResponse</code> 与 <code>WireFormat</code> 完成类型化多端点转换</li>
 <li>通过 <code>ReplayFixture</code> 与 <code>sanitize_*</code> 完成回放夹具脱敏</li>
@@ -60,6 +60,7 @@
 <p>然后在你选择的智能体中开启一个新会话，并提出一个 OmniLLM 相关的问题，例如：</p>
 <ul>
 <li>用 <code>ProviderEndpoint</code> 和 <code>KeyConfig</code> 搭一个 <code>GatewayBuilder</code> 流程</li>
+<li>给某个 OpenAI 兼容包装层配置 <code>EndpointProtocol::*_compat</code> 运行时端点</li>
 <li>解释什么时候应该使用 <code>Gateway</code>，什么时候应该直接用 <code>transcode_*</code></li>
 <li>排查 <code>NoAvailableKey</code>、<code>BudgetExceeded</code> 或 <code>Protocol(...)</code></li>
 <li>把一个 <code>ApiRequest</code> 输出成 provider 的传输格式</li>
