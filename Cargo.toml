@@ -9,7 +9,7 @@ readme      = "README.md"
 repository  = "https://github.com/aiomni/omnillm"
 homepage    = "https://github.com/aiomni/omnillm"
 documentation = "https://docs.rs/omnillm"
-keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai", "claude", "gemini"]
+keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai"]
 categories  = ["api-bindings", "asynchronous", "network-programming"]
 include     = [
   "/Cargo.toml",
