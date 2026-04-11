@@ -2,7 +2,7 @@
 title: 使用指南
 description: 安装 OmniLLM、配置 provider 端点、发送规范化请求、处理流式结果，并按生产环境形态运行这个运行时。
 label: 运行指南
-release: v0.1.1
+release: v0.1.2
 updated: 2026 年 4 月
 summary: 运行时初始化、Gateway 调用、协议桥接、预算跟踪、回放脱敏与运维模式。
 ---
@@ -212,6 +212,8 @@ let endpoint = ProviderEndpoint::new(
 
 当 `base_url` 只是 host 或前缀时，使用非 `compat` 协议，让 OmniLLM 自动补齐标准路径。
 当 `base_url` 已经是某个包装层或兼容网关暴露出来的完整请求 URL 时，使用 `*_compat` 协议。
+这也包括那些要求 OpenAI Chat Completions payload 使用严格
+`messages[].content[]` 数组形态的包装层。
 `EndpointProtocol` 是运行时配置层；`ClaudeMessages`、`GeminiGenerateContent` 这类名字保留在 `ProviderProtocol` 上，因为它们对应的是上游 wire API 形态，供 `parse_*`、`emit_*`、`transcode_*` 使用。
 
 ### 鉴权方式
@@ -236,6 +238,12 @@ let endpoint = ProviderEndpoint::new(
 如果 `input` 非空，它会被视为真实输入来源；如果 `input` 为空，则回退使用 `messages`。
 
 新代码建议优先使用 `input`。
+
+`Message.parts` 是兼容式聊天视图背后的内容模型。当 OmniLLM 输出
+OpenAI Chat Completions 请求时，纯文本聊天消息会保持为数组形态：
+`MessagePart::Text { text: "hi?".into() }` 会变成
+`content: [{ "type": "text", "text": "hi?" }]`。这对拒绝裸字符串
+`content` 的 compat 包装层尤其重要。
 
 ### `instructions` 字段
 
@@ -518,7 +526,10 @@ use omnillm::{transcode_request, ProviderProtocol};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 
@@ -586,7 +597,10 @@ use omnillm::{transcode_api_request, WireFormat};
 
 let raw = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 

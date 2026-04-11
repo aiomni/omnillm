@@ -2,7 +2,7 @@
 title: 实现说明
 description: 当你需要具体执行路径、数据结构和内部边界时，按模块阅读这个库的实现。
 label: 实现走读
-release: v0.1.1
+release: v0.1.2
 updated: 2026 年 4 月
 summary: 模块布局、错误模型，以及真正落实 Key 池、限流器和预算行为的核心结构体。
 ---
@@ -47,7 +47,7 @@ omnillm/
 ```toml
 [package]
 name    = "omnillm"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]

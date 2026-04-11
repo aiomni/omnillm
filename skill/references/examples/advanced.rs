@@ -7,7 +7,10 @@ use serde_json::json;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let raw_chat = json!({
         "model": "gpt-4.1-mini",
-        "messages": [{ "role": "user", "content": "Hello!" }],
+        "messages": [{
+            "role": "user",
+            "content": [{ "type": "text", "text": "Hello!" }]
+        }],
         "max_tokens": 32
     })
     .to_string();

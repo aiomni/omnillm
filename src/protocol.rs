@@ -2434,18 +2434,6 @@ fn openai_chat_content(parts: &[MessagePart]) -> Result<Value, ProtocolError> {
     if parts.is_empty() {
         return Ok(Value::Null);
     }
-    if parts
-        .iter()
-        .all(|part| matches!(part, MessagePart::Text { .. }))
-    {
-        return Ok(Value::String(
-            parts
-                .iter()
-                .filter_map(MessagePart::plain_text)
-                .collect::<Vec<_>>()
-                .join(""),
-        ));
-    }
     Ok(Value::Array(
         parts
             .iter()
@@ -3427,6 +3415,28 @@ mod tests {
         assert_eq!(body["tools"][0]["name"], "lookup_weather");
         assert!(body["tools"][0].get("function").is_none());
         assert_eq!(body["tools"][0]["strict"], true);
+    }
+
+    #[test]
+    fn emit_openai_chat_request_uses_content_part_arrays_for_plain_text_messages() {
+        let request = LlmRequest {
+            model: "gpt-4.1-mini".into(),
+            instructions: None,
+            input: vec![RequestItem::from(Message::text(MessageRole::User, "Hello"))],
+            messages: Vec::new(),
+            capabilities: Default::default(),
+            generation: GenerationConfig::default(),
+            metadata: Default::default(),
+            vendor_extensions: Default::default(),
+        };
+
+        let raw = emit_request(ProviderProtocol::OpenAiChatCompletions, &request)
+            .expect("emit chat request");
+        let body: Value = serde_json::from_str(&raw).expect("parse emitted body");
+
+        assert_eq!(body["messages"][0]["role"], "user");
+        assert_eq!(body["messages"][0]["content"][0]["type"], "text");
+        assert_eq!(body["messages"][0]["content"][0]["text"], "Hello");
     }
 
     #[test]

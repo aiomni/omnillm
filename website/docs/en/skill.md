@@ -2,7 +2,7 @@
 title: Skill Guide
 description: Install the OmniLLM Skill in Claude Code, Codex, or OpenCode with the Vercel Labs skills installer, and use it for OmniLLM-aware coding and debugging.
 label: skill guide
-release: v0.1.1
+release: v0.1.2
 updated: Apr 2026
 summary: Vercel Labs skills CLI commands for GitHub-based installation and verification across agent runtimes.
 ---
@@ -82,7 +82,7 @@ Then start a new session in your chosen agent and ask for something
 OmniLLM-specific, for example:
 
 - scaffold a `GatewayBuilder` flow with `ProviderEndpoint` and `KeyConfig`
-- configure an `EndpointProtocol::*_compat` runtime endpoint for an OpenAI-compatible wrapper
+- configure an `EndpointProtocol::*_compat` runtime endpoint for an OpenAI-compatible wrapper that requires `messages[].content[]`
 - explain when `Gateway` is correct versus `transcode_*`
 - debug `NoAvailableKey`, `BudgetExceeded`, or `Protocol(...)`
 - emit an `ApiRequest` into a provider wire format

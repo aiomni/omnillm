@@ -18,7 +18,7 @@ description: |
 license: MIT OR Apache-2.0
 metadata:
   author: aiomni
-  version: 0.1.1
+  version: 0.1.2
   docs: https://docs.rs/omnillm
   repo: https://github.com/aiomni/omnillm
 ---
@@ -106,6 +106,11 @@ For new code:
 - prefer `LlmRequest.input` over `messages`
 - put top-level system or developer guidance in `instructions`
 - represent user text with `RequestItem::from(Message::text(...))`
+- when targeting OpenAI Chat Completions, build message content with
+  `Message.parts` and `MessagePart::*`
+- plain-text `MessagePart::Text` is emitted as `messages[].content[]` with
+  `{ "type": "text", "text": ... }`, which matters for compat wrappers that
+  reject bare string `content`
 - keep `capabilities` explicit when the user wants tools, structured output,
   reasoning, builtin tools, or modal output
 
@@ -139,6 +144,9 @@ let endpoint = ProviderEndpoint::new(
 Use official `EndpointProtocol` variants when OmniLLM should derive the
 standard upstream path from a host or prefix. Use `*_compat` variants when the
 upstream already exposes the full request URL.
+Use `OpenAiChatCompletionsCompat` when a wrapper exposes a full chat endpoint
+and still expects the OpenAI Chat wire shape, especially when it insists on
+array-shaped `messages[].content[]`.
 
 Only override auth if the upstream actually needs it. Keep `ProviderProtocol`
 for `parse_*`, `emit_*`, and `transcode_*` work.

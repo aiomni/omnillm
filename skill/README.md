@@ -65,6 +65,8 @@ Start a new agent session and ask it to do something OmniLLM-specific, for
 example:
 
 - build a `GatewayBuilder` flow
+- configure an `EndpointProtocol::*_compat` endpoint for a wrapper that
+  requires `messages[].content[]` arrays
 - explain when `Gateway` is the right surface versus `transcode_*`
 - debug `NoAvailableKey` or `BudgetExceeded`
 - emit an `ApiRequest` as a provider wire format

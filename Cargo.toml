@@ -1,6 +1,6 @@
 [package]
 name        = "omnillm"
-version     = "0.1.1"
+version     = "0.1.2"
 edition     = "2021"
 rust-version = "1.75"
 description = "Production-grade LLM API gateway with multi-key load balancing, per-key rate limiting, circuit breaking, and cost tracking"
@@ -9,7 +9,7 @@ readme      = "README.md"
 repository  = "https://github.com/aiomni/omnillm"
 homepage    = "https://github.com/aiomni/omnillm"
 documentation = "https://docs.rs/omnillm"
-keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai"]
+keywords    = ["llm", "gateway", "rate-limiting", "load-balancing", "openai", "claude", "gemini"]
 categories  = ["api-bindings", "asynchronous", "network-programming"]
 include     = [
   "/Cargo.toml",

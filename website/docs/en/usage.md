@@ -2,7 +2,7 @@
 title: Usage Guide
 description: Install OmniLLM, configure provider endpoints, send canonical requests, stream results, and operate the runtime in production-shaped flows.
 label: runtime guide
-release: v0.1.1
+release: v0.1.2
 updated: Apr 2026
 summary: Runtime setup, gateway execution, protocol bridging, budget tracking, replay sanitization, and operational patterns.
 ---
@@ -215,6 +215,7 @@ let endpoint = ProviderEndpoint::new(
 
 Use a non-`compat` protocol when `base_url` is a host or prefix and OmniLLM should derive the standard path.
 Use a `*_compat` protocol when `base_url` is already the full request URL exposed by a wrapper or OpenAI-compatible gateway.
+That includes wrappers that expect strict `messages[].content[]` arrays for OpenAI Chat Completions payloads.
 `EndpointProtocol` is the runtime configuration surface; names such as `ClaudeMessages` and `GeminiGenerateContent` live on `ProviderProtocol` because they mirror upstream wire APIs used by the parse, emit, and transcode helpers.
 
 ### Authentication Modes
@@ -239,6 +240,12 @@ If you do not set an auth scheme explicitly, `ProviderEndpoint` uses a protocol-
 If `input` is non-empty, it is treated as the source of truth. If `input` is empty, `messages` is used.
 
 For new code, prefer `input`.
+
+`Message.parts` is the content model behind the compatibility view. When
+OmniLLM emits OpenAI Chat Completions payloads, plain-text chat messages stay
+array-shaped: `MessagePart::Text { text: "hi?".into() }` becomes
+`content: [{ "type": "text", "text": "hi?" }]`. This is useful for compat
+wrappers that reject bare string `content`.
 
 ### Instructions
 
@@ -521,7 +528,10 @@ use omnillm::{transcode_request, ProviderProtocol};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 
@@ -589,7 +599,10 @@ use omnillm::{transcode_api_request, WireFormat};
 
 let raw = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 

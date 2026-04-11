@@ -518,7 +518,8 @@ fn generation_transport_requests_use_expected_paths_and_bridge_flags() {
             }
             WireFormat::OpenAiChatCompletions => {
                 assert_eq!(value["model"], "test-model");
-                assert_eq!(value["messages"][1]["content"], "Hello!");
+                assert_eq!(value["messages"][1]["content"][0]["type"], "text");
+                assert_eq!(value["messages"][1]["content"][0]["text"], "Hello!");
             }
             WireFormat::AnthropicMessages => {
                 assert_eq!(value["model"], "test-model");

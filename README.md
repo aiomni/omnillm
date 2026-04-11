@@ -160,6 +160,10 @@ let endpoint = ProviderEndpoint::new(
 Use official `EndpointProtocol` variants when OmniLLM should derive standard
 upstream paths from a host or prefix. Use `*_compat` variants when the upstream
 wrapper already exposes the full request URL.
+For OpenAI Chat Completions wrappers that reject bare string `content`,
+construct chat input with `Message.parts`: OmniLLM emits plain-text chat
+messages as typed `content` arrays such as
+`[{ "type": "text", "text": "hi?" }]`.
 
 ## Protocol Transcoding
 
@@ -168,7 +172,10 @@ use omnillm::{transcode_request, ProviderProtocol};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 
@@ -186,7 +193,10 @@ use omnillm::{transcode_api_request, WireFormat};
 
 let raw_chat = r#"{
   "model": "gpt-4.1-mini",
-  "messages": [{"role": "user", "content": "Hello!"}],
+  "messages": [{
+    "role": "user",
+    "content": [{ "type": "text", "text": "Hello!" }]
+  }],
   "max_tokens": 32
 }"#;
 

@@ -90,6 +90,10 @@ Supporting types you will often use:
 - `MessagePart`
 - `RequestItem`
 
+`Message.parts` is the canonical content model behind chat compatibility input.
+When OmniLLM emits OpenAI Chat Completions payloads, plain text stays in
+`messages[].content[]` as typed parts rather than collapsing to a bare string.
+
 ### `GenerationConfig`
 
 Common controls:
@@ -162,6 +166,9 @@ Use official `EndpointProtocol` variants when `base_url` is a host or prefix
 and OmniLLM should derive the standard path. Use `*_compat` variants when
 `base_url` is already the full request URL exposed by a wrapper or compatibility
 gateway.
+`OpenAiChatCompletionsCompat` is the right runtime choice when a wrapper
+exposes a full chat-completions URL and insists on strict array-shaped
+`content` parts.
 
 `AuthScheme` supports:
 

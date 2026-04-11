@@ -1670,7 +1670,8 @@ mod tests {
         .expect("transcode response");
 
         let body: Value = serde_json::from_str(&report.value).expect("parse response");
-        assert_eq!(body["choices"][0]["message"]["content"], "Hello back!");
+        assert_eq!(body["choices"][0]["message"]["content"][0]["type"], "text");
+        assert_eq!(body["choices"][0]["message"]["content"][0]["text"], "Hello back!");
     }
 
     #[test]
