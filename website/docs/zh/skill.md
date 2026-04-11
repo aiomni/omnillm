@@ -2,7 +2,7 @@
 title: 技能指南
 description: 通过 Vercel Labs skills 安装器把 OmniLLM Skill 安装到 Claude Code、Codex 或 OpenCode 中，并将其用于 OmniLLM 相关编码与调试。
 label: 技能指南
-release: v0.1.0
+release: v0.1.1
 updated: 2026 年 4 月
 summary: 通过 GitHub 源安装 OmniLLM Skill 的 Vercel Labs skills CLI 命令，以及不同 agent 的验证方法。
 ---

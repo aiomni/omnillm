@@ -2,7 +2,7 @@
 title: 使用指南
 description: 安装 OmniLLM、配置 provider 端点、发送规范化请求、处理流式结果，并按生产环境形态运行这个运行时。
 label: 运行指南
-release: v0.1.0
+release: v0.1.1
 updated: 2026 年 4 月
 summary: 运行时初始化、Gateway 调用、协议桥接、预算跟踪、回放脱敏与运维模式。
 ---

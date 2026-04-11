@@ -1,6 +1,6 @@
 [package]
 name        = "omnillm"
-version     = "0.1.0"
+version     = "0.1.1"
 edition     = "2021"
 rust-version = "1.75"
 description = "Production-grade LLM API gateway with multi-key load balancing, per-key rate limiting, circuit breaking, and cost tracking"

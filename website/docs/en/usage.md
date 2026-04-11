@@ -2,7 +2,7 @@
 title: Usage Guide
 description: Install OmniLLM, configure provider endpoints, send canonical requests, stream results, and operate the runtime in production-shaped flows.
 label: runtime guide
-release: v0.1.0
+release: v0.1.1
 updated: Apr 2026
 summary: Runtime setup, gateway execution, protocol bridging, budget tracking, replay sanitization, and operational patterns.
 ---

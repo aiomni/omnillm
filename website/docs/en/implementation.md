@@ -2,7 +2,7 @@
 title: Implementation Notes
 description: Walk the crate module by module when you want the concrete execution path, data structures, and internal boundaries.
 label: source walkthrough
-release: v0.1.0
+release: v0.1.1
 updated: Apr 2026
 summary: Module layout, error model, and the core structs that enforce pool, limiter, and budget behavior.
 ---
@@ -48,7 +48,7 @@ omnillm/
 ```toml
 [package]
 name    = "omnillm"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]

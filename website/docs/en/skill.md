@@ -2,7 +2,7 @@
 title: Skill Guide
 description: Install the OmniLLM Skill in Claude Code, Codex, or OpenCode with the Vercel Labs skills installer, and use it for OmniLLM-aware coding and debugging.
 label: skill guide
-release: v0.1.0
+release: v0.1.1
 updated: Apr 2026
 summary: Vercel Labs skills CLI commands for GitHub-based installation and verification across agent runtimes.
 ---

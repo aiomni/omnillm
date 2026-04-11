@@ -18,7 +18,7 @@ description: |
 license: MIT OR Apache-2.0
 metadata:
   author: aiomni
-  version: 0.1.0
+  version: 0.1.1
   docs: https://docs.rs/omnillm
   repo: https://github.com/aiomni/omnillm
 ---
