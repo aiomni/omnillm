@@ -147,6 +147,11 @@ upstream already exposes the full request URL.
 Use `OpenAiChatCompletionsCompat` when a wrapper exposes a full chat endpoint
 and still expects the OpenAI Chat wire shape, especially when it insists on
 array-shaped `messages[].content[]`.
+When a wrapper also requires extra top-level OpenAI request fields that
+OmniLLM does not normalize, put them in `LlmRequest.vendor_extensions`.
+For OpenAI Responses and OpenAI Chat Completions, OmniLLM emits those
+top-level vendor extensions back onto the request body. Use this for wrapper
+flags such as `enable_thinking` instead of inventing new canonical fields.
 
 Only override auth if the upstream actually needs it. Keep `ProviderProtocol`
 for `parse_*`, `emit_*`, and `transcode_*` work.

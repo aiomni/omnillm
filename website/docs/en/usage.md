@@ -2,7 +2,7 @@
 title: Usage Guide
 description: Install OmniLLM, configure provider endpoints, send canonical requests, stream results, and operate the runtime in production-shaped flows.
 label: runtime guide
-release: v0.1.2
+release: v0.1.3
 updated: Apr 2026
 summary: Runtime setup, gateway execution, protocol bridging, budget tracking, replay sanitization, and operational patterns.
 ---
@@ -246,6 +246,36 @@ OmniLLM emits OpenAI Chat Completions payloads, plain-text chat messages stay
 array-shaped: `MessagePart::Text { text: "hi?".into() }` becomes
 `content: [{ "type": "text", "text": "hi?" }]`. This is useful for compat
 wrappers that reject bare string `content`.
+
+### Provider-Specific Top-Level Fields
+
+Use `LlmRequest.vendor_extensions` for request fields that OmniLLM does not
+normalize.
+
+For OpenAI `responses` and `chat_completions`, OmniLLM preserves top-level
+request vendor extensions across parse/emit and transport emission. This is
+the right place for wrapper-specific flags such as `enable_thinking`.
+
+```rust
+use omnillm::{LlmRequest, Message, MessageRole, RequestItem};
+use serde_json::json;
+
+let request = LlmRequest {
+    model: "openai_qwen3.5-plus".into(),
+    input: vec![RequestItem::from(Message::text(
+        MessageRole::User,
+        "Say hello in Chinese.",
+    ))],
+    vendor_extensions: [("enable_thinking".into(), json!(false))]
+        .into_iter()
+        .collect(),
+    ..Default::default()
+};
+```
+
+Keep normalized controls in `generation`, `capabilities`, and `metadata`.
+Reach for `vendor_extensions` only when a wrapper needs extra fields that
+OmniLLM does not model directly.
 
 ### Instructions
 

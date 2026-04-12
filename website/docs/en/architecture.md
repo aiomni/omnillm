@@ -2,7 +2,7 @@
 title: Architecture Notes
 description: Read the key-pool acquisition model, lease lifecycle, and budget tracker design before diving into the source.
 label: system design
-release: v0.1.2
+release: v0.1.3
 updated: Apr 2026
 summary: Random-start acquisition, explicit cooldown semantics, and fixed-point budget settlement across the runtime.
 ---

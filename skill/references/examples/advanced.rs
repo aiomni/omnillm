@@ -11,7 +11,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "role": "user",
             "content": [{ "type": "text", "text": "Hello!" }]
         }],
-        "max_tokens": 32
+        "max_tokens": 32,
+        "enable_thinking": false
     })
     .to_string();
 
@@ -24,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "bridged={} lossy={}",
         transcoded.bridged, transcoded.lossy
     );
+    println!("responses payload: {}", transcoded.value);
     for reason in &transcoded.loss_reasons {
         println!("loss: {reason}");
     }

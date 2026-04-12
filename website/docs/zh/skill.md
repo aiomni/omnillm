@@ -2,7 +2,7 @@
 title: 技能指南
 description: 通过 Vercel Labs skills 安装器把 OmniLLM Skill 安装到 Claude Code、Codex 或 OpenCode 中，并将其用于 OmniLLM 相关编码与调试。
 label: 技能指南
-release: v0.1.2
+release: v0.1.3
 updated: 2026 年 4 月
 summary: 通过 GitHub 源安装 OmniLLM Skill 的 Vercel Labs skills CLI 命令，以及不同 agent 的验证方法。
 ---
@@ -79,6 +79,7 @@ npx skills ls -a codex --json
 
 - 用 `ProviderEndpoint` 和 `KeyConfig` 搭一个 `GatewayBuilder` 流程
 - 给某个要求 `messages[].content[]` 的 OpenAI 兼容包装层配置 `EndpointProtocol::*_compat` 运行时端点
+- 用 `LlmRequest.vendor_extensions` 透传 `enable_thinking` 这类包装层特有的 OpenAI 顶层字段
 - 解释什么时候应该使用 `Gateway`，什么时候应该直接用 `transcode_*`
 - 排查 `NoAvailableKey`、`BudgetExceeded` 或 `Protocol(...)`
 - 把一个 `ApiRequest` 输出成 provider 的传输格式

@@ -11,7 +11,7 @@ type OmniDocFrontmatter = {
   updated?: string;
 };
 
-const DEFAULT_RELEASE = 'v0.1.2';
+const DEFAULT_RELEASE = 'v0.1.3';
 const DEFAULT_UPDATED = 'Apr 2026';
 
 function buildAnchor(id: string) {

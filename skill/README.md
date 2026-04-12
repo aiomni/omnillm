@@ -67,6 +67,8 @@ example:
 - build a `GatewayBuilder` flow
 - configure an `EndpointProtocol::*_compat` endpoint for a wrapper that
   requires `messages[].content[]` arrays
+- pass through wrapper-specific OpenAI top-level fields such as
+  `enable_thinking` via `LlmRequest.vendor_extensions`
 - explain when `Gateway` is the right surface versus `transcode_*`
 - debug `NoAvailableKey` or `BudgetExceeded`
 - emit an `ApiRequest` as a provider wire format

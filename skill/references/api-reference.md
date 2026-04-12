@@ -82,6 +82,11 @@ Guidance:
 - Prefer `input` for new code.
 - Use `instructions` for top-level system or developer guidance.
 - Treat `messages` as a compatibility view when you need chat-shaped input.
+- Use `vendor_extensions` for provider-specific top-level request fields that
+  OmniLLM does not normalize.
+- For OpenAI `responses` and `chat_completions`, those top-level
+  `vendor_extensions` are emitted back onto the wire. This is where wrapper
+  flags such as `enable_thinking` belong.
 
 Supporting types you will often use:
 
@@ -169,6 +174,9 @@ gateway.
 `OpenAiChatCompletionsCompat` is the right runtime choice when a wrapper
 exposes a full chat-completions URL and insists on strict array-shaped
 `content` parts.
+If the same wrapper also needs extra top-level OpenAI request fields, keep
+those fields in `LlmRequest.vendor_extensions` rather than adding ad hoc
+canonical fields.
 
 `AuthScheme` supports:
 

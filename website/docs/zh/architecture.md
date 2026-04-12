@@ -2,7 +2,7 @@
 title: 架构说明
 description: 在阅读源码之前，先了解 Key 池获取模型、租约生命周期和预算跟踪器设计。
 label: 架构说明
-release: v0.1.2
+release: v0.1.3
 updated: 2026 年 4 月
 summary: 从随机起点获取 Key、显式冷却语义，以及覆盖整个运行时的定点预算结算。
 ---

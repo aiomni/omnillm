@@ -701,9 +701,9 @@ fn sanitize_generation_request(
         ));
     }
 
-    if wire_format != WireFormat::OpenAiResponses && request_has_vendor_extensions(request) {
+    if request_has_unemitted_vendor_extensions(wire_format, request) {
         loss_reasons.push(format!(
-            "vendor_extensions and raw_message fields are not emitted to {}",
+            "some vendor_extensions and raw_message fields are not emitted to {}",
             wire_format_name(wire_format)
         ));
     }
@@ -711,8 +711,16 @@ fn sanitize_generation_request(
     (sanitized, dedupe_loss_reasons(loss_reasons))
 }
 
-fn request_has_vendor_extensions(request: &LlmRequest) -> bool {
-    if !request.vendor_extensions.is_empty() || !request.capabilities.vendor_extensions.is_empty() {
+fn request_has_unemitted_vendor_extensions(wire_format: WireFormat, request: &LlmRequest) -> bool {
+    let top_level_request_vendor_extensions_are_emitted = matches!(
+        wire_format,
+        WireFormat::OpenAiResponses | WireFormat::OpenAiChatCompletions
+    );
+
+    if (!top_level_request_vendor_extensions_are_emitted && !request.vendor_extensions.is_empty())
+        || !request.capabilities.vendor_extensions.is_empty()
+        || !request.generation.vendor_extensions.is_empty()
+    {
         return true;
     }
 
@@ -1622,6 +1630,35 @@ mod tests {
     }
 
     #[test]
+    fn emit_transport_request_for_chat_keeps_top_level_vendor_extensions() {
+        let request = ApiRequest::Responses(LlmRequest {
+            model: "openai_qwen3.5-plus".into(),
+            instructions: None,
+            input: vec![RequestItem::from(Message::text(
+                MessageRole::User,
+                "Say hello in Chinese.",
+            ))],
+            messages: Vec::new(),
+            capabilities: Default::default(),
+            generation: GenerationConfig::default(),
+            metadata: Default::default(),
+            vendor_extensions: [("enable_thinking".into(), Value::Bool(false))]
+                .into_iter()
+                .collect(),
+        });
+
+        let report = emit_transport_request(WireFormat::OpenAiChatCompletions, &request)
+            .expect("emit transport request");
+
+        assert!(report.bridged);
+        assert!(!report.lossy);
+        let RequestBody::Json { value } = report.value.body else {
+            panic!("expected json body");
+        };
+        assert_eq!(value["enable_thinking"], false);
+    }
+
+    #[test]
     fn parse_transport_response_for_audio_speech_reads_binary_payload() {
         let response = TransportResponse {
             status: 200,
@@ -1671,7 +1708,10 @@ mod tests {
 
         let body: Value = serde_json::from_str(&report.value).expect("parse response");
         assert_eq!(body["choices"][0]["message"]["content"][0]["type"], "text");
-        assert_eq!(body["choices"][0]["message"]["content"][0]["text"], "Hello back!");
+        assert_eq!(
+            body["choices"][0]["message"]["content"][0]["text"],
+            "Hello back!"
+        );
     }
 
     #[test]

@@ -540,7 +540,27 @@ fn parse_openai_responses_request(body: &Value) -> Result<LlmRequest, ProtocolEr
         capabilities,
         generation,
         metadata: object_to_extensions(body.get("metadata")),
-        vendor_extensions: VendorExtensions::new(),
+        vendor_extensions: collect_vendor_extensions(
+            body,
+            &[
+                "model",
+                "instructions",
+                "input",
+                "tools",
+                "text",
+                "reasoning",
+                "max_output_tokens",
+                "temperature",
+                "top_p",
+                "top_k",
+                "stop",
+                "presence_penalty",
+                "frequency_penalty",
+                "seed",
+                "metadata",
+                "stream",
+            ],
+        ),
     })
 }
 
@@ -592,6 +612,7 @@ fn emit_openai_responses_request(
             Value::Object(extensions_to_object(&request.metadata)),
         );
     }
+    extend_with_vendor_extensions(&mut map, &request.vendor_extensions);
     if stream {
         map.insert("stream".into(), Value::Bool(true));
     }
@@ -638,7 +659,23 @@ fn parse_openai_chat_request(body: &Value) -> Result<LlmRequest, ProtocolError> 
         capabilities,
         generation,
         metadata: VendorExtensions::new(),
-        vendor_extensions: VendorExtensions::new(),
+        vendor_extensions: collect_vendor_extensions(
+            body,
+            &[
+                "model",
+                "messages",
+                "tools",
+                "response_format",
+                "max_tokens",
+                "temperature",
+                "top_p",
+                "stop",
+                "presence_penalty",
+                "frequency_penalty",
+                "seed",
+                "stream",
+            ],
+        ),
     })
 }
 
@@ -686,6 +723,7 @@ fn emit_openai_chat_request(request: &LlmRequest, stream: bool) -> Result<Value,
     }
 
     emit_generation_common(&mut map, &request.generation, false);
+    extend_with_vendor_extensions(&mut map, &request.vendor_extensions);
 
     if stream {
         map.insert("stream".into(), Value::Bool(true));
@@ -3055,6 +3093,27 @@ fn extensions_to_object(value: &VendorExtensions) -> Map<String, Value> {
         .collect()
 }
 
+fn collect_vendor_extensions(value: &Value, known_fields: &[&str]) -> VendorExtensions {
+    let Some(object) = value.as_object() else {
+        return VendorExtensions::new();
+    };
+
+    object
+        .iter()
+        .filter(|(key, _)| !known_fields.contains(&key.as_str()))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+fn extend_with_vendor_extensions(
+    map: &mut Map<String, Value>,
+    vendor_extensions: &VendorExtensions,
+) {
+    for (key, value) in vendor_extensions {
+        map.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+}
+
 fn parse_builtin_tool(tool_type: &str, value: &Value) -> BuiltinTool {
     match tool_type {
         "web_search" => BuiltinTool::WebSearch,
@@ -3437,6 +3496,60 @@ mod tests {
         assert_eq!(body["messages"][0]["role"], "user");
         assert_eq!(body["messages"][0]["content"][0]["type"], "text");
         assert_eq!(body["messages"][0]["content"][0]["text"], "Hello");
+    }
+
+    #[test]
+    fn openai_chat_request_round_trips_top_level_vendor_extensions() {
+        let raw = json!({
+            "model": "openai_qwen3.5-plus",
+            "messages": [{
+                "role": "user",
+                "content": "Say hello in Chinese."
+            }],
+            "enable_thinking": false,
+            "stream": true
+        });
+
+        let request = parse_request(ProviderProtocol::OpenAiChatCompletions, &raw.to_string())
+            .expect("parse chat request");
+
+        assert_eq!(
+            request.vendor_extensions.get("enable_thinking"),
+            Some(&Value::Bool(false))
+        );
+        assert!(request.vendor_extensions.get("stream").is_none());
+
+        let emitted = emit_request(ProviderProtocol::OpenAiChatCompletions, &request)
+            .expect("emit chat request");
+        let body: Value = serde_json::from_str(&emitted).expect("parse emitted body");
+
+        assert_eq!(body["enable_thinking"], false);
+        assert!(body.get("stream").is_none());
+    }
+
+    #[test]
+    fn emit_openai_responses_request_includes_top_level_vendor_extensions() {
+        let request = LlmRequest {
+            model: "openai_qwen3.5-plus".into(),
+            instructions: None,
+            input: vec![RequestItem::from(Message::text(
+                MessageRole::User,
+                "Say hello in Chinese.",
+            ))],
+            messages: Vec::new(),
+            capabilities: Default::default(),
+            generation: GenerationConfig::default(),
+            metadata: Default::default(),
+            vendor_extensions: [("enable_thinking".into(), Value::Bool(false))]
+                .into_iter()
+                .collect(),
+        };
+
+        let emitted = emit_request(ProviderProtocol::OpenAiResponses, &request)
+            .expect("emit responses request");
+        let body: Value = serde_json::from_str(&emitted).expect("parse emitted body");
+
+        assert_eq!(body["enable_thinking"], false);
     }
 
     #[test]
