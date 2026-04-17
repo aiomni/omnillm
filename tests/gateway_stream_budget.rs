@@ -7,6 +7,7 @@ use omnillm::{
     LlmRequest, LlmStreamEvent, Message, MessageRole, ProviderEndpoint, ProviderProtocol,
     ProviderStreamFrame, RequestItem,
 };
+use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
@@ -69,6 +70,63 @@ async fn stream_synthesizes_usage_when_chat_stream_ends_without_usage() {
             - expected_gpt4o_cost_usd(estimated_prompt_tokens, completion_tokens))
         .abs()
             < 1e-12
+    );
+
+    server
+        .await
+        .expect("server task should finish")
+        .expect("server should succeed");
+}
+
+#[tokio::test]
+async fn stream_preserves_first_chat_content_when_role_and_content_share_frame() {
+    let request = test_request();
+    let body = sse_body(&[
+        ProviderStreamFrame {
+            event: None,
+            data: json!({
+                "id": "resp-chat",
+                "model": request.model.clone(),
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "content": "hello"
+                    }
+                }]
+            })
+            .to_string(),
+        },
+        ProviderStreamFrame {
+            event: None,
+            data: "[DONE]".into(),
+        },
+    ]);
+
+    let (base_url, server) = spawn_server(ServerMode::Ok { body }).await;
+    let gateway = test_gateway(ProviderProtocol::OpenAiChatCompletions, base_url);
+
+    let mut stream = gateway
+        .stream(request, CancellationToken::new())
+        .await
+        .expect("stream should start");
+
+    let mut streamed = String::new();
+    let mut completed = None;
+    while let Some(item) = stream.next().await {
+        match item.expect("chat stream should complete cleanly") {
+            LlmStreamEvent::TextDelta { delta } => streamed.push_str(&delta),
+            LlmStreamEvent::Completed { response } => completed = Some(response),
+            _ => {}
+        }
+    }
+
+    assert_eq!(streamed, "hello");
+    assert_eq!(
+        completed
+            .expect("gateway should synthesize a completed response")
+            .content_text,
+        "hello"
     );
 
     server

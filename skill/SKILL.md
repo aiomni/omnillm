@@ -18,7 +18,7 @@ description: |
 license: MIT OR Apache-2.0
 metadata:
   author: aiomni
-  version: 0.1.2
+  version: 0.1.4
   docs: https://docs.rs/omnillm
   repo: https://github.com/aiomni/omnillm
 ---
@@ -221,6 +221,12 @@ Use:
 - `transcode_stream_event`
 - `ProviderProtocol`
 
+For OpenAI Chat Completions compat streaming, do not assume one upstream SSE
+frame maps to exactly one semantic event. Some wrappers send
+`delta.role = "assistant"` and the first `delta.content` in the same frame.
+When working on runtime streaming or protocol internals, preserve the first
+text delta instead of letting a start event swallow it.
+
 Read next:
 
 - `references/examples/advanced.rs`
@@ -290,6 +296,11 @@ protocol cannot encode some requested features. If transcoding, inspect
 This can be normal. The gateway can estimate partial usage and synthesize a
 terminal `Completed` event when the upstream does not provide a final canonical
 response.
+
+**OpenAI Chat compat stream lost the first text chunk**
+Check whether the wrapper coalesced `delta.role` and the first `delta.content`
+into the same SSE frame. Runtime streaming should preserve that first text
+delta instead of treating the frame as start-only.
 
 ## Live Demo Signals
 

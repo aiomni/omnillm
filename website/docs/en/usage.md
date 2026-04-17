@@ -2,7 +2,7 @@
 title: Usage Guide
 description: Install OmniLLM, configure provider endpoints, send canonical requests, stream results, and operate the runtime in production-shaped flows.
 label: runtime guide
-release: v0.1.3
+release: v0.1.4
 updated: Apr 2026
 summary: Runtime setup, gateway execution, protocol bridging, budget tracking, replay sanitization, and operational patterns.
 ---
@@ -424,6 +424,7 @@ while let Some(event) = stream.next().await {
 
 - The stream yields `Result<LlmStreamEvent, GatewayError>`.
 - Some upstreams send a terminal `Completed` event; others end with `[DONE]` or protocol-specific stop markers.
+- OpenAI Chat Completions compat wrappers sometimes coalesce `delta.role = "assistant"` and the first `delta.content` into one SSE frame. The gateway preserves that initial text delta instead of dropping it behind `ResponseStarted`.
 - The gateway synthesizes a terminal `Completed` event when needed so callers still get a final canonical response.
 - If a stream ends or fails before usage metadata is available, the gateway falls back to internal usage estimation to settle budget instead of refunding the whole reservation.
 
@@ -550,6 +551,10 @@ Use these helpers when you want to work directly with supported generation proto
 - `transcode_response`
 - `transcode_stream_event`
 - `transcode_error`
+
+These are low-level frame-oriented helpers. For production runtime streaming,
+prefer `Gateway::stream`, especially when an upstream compat wrapper may pack
+multiple stream semantics into one provider frame.
 
 Example:
 

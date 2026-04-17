@@ -2,7 +2,7 @@
 title: 使用指南
 description: 安装 OmniLLM、配置 provider 端点、发送规范化请求、处理流式结果，并按生产环境形态运行这个运行时。
 label: 运行指南
-release: v0.1.3
+release: v0.1.4
 updated: 2026 年 4 月
 summary: 运行时初始化、Gateway 调用、协议桥接、预算跟踪、回放脱敏与运维模式。
 ---
@@ -422,6 +422,7 @@ while let Some(event) = stream.next().await {
 
 - 流会产出 `Result<LlmStreamEvent, GatewayError>`。
 - 有些上游会发送一个终态 `Completed` 事件；也有些上游会以 `[DONE]` 或协议特定的停止标记结束。
+- 某些 OpenAI Chat Completions compat 包装层会把 `delta.role = "assistant"` 和首段 `delta.content` 合并进同一个 SSE frame。gateway 会保留这段首个文本增量，而不是只把它当成 `ResponseStarted`。
 - 当上游没有提供终态完成事件时，gateway 会按需合成一个 `Completed`，让调用方仍然能拿到最终规范化响应。
 - 如果流在 usage 元数据出现之前就结束或失败，gateway 会回退到内部 usage 估算来结算预算，而不是把整笔预留全部退回。
 
@@ -548,6 +549,8 @@ for status in gateway.pool_status() {
 - `transcode_response`
 - `transcode_stream_event`
 - `transcode_error`
+
+这些 helper 是面向底层单 frame 的协议工具。对于生产环境里的运行时流处理，优先使用 `Gateway::stream`；尤其当上游 compat 包装层可能把多个流语义塞进同一个 provider frame 时更是如此。
 
 示例：
 

@@ -428,21 +428,36 @@ pub fn transcode_error(
     emit_error(to, &error)
 }
 
-pub fn parse_stream_event(
+pub(crate) fn parse_stream_events(
     protocol: ProviderProtocol,
     frame: &ProviderStreamFrame,
-) -> Result<Option<LlmStreamEvent>, ProtocolError> {
+) -> Result<Vec<LlmStreamEvent>, ProtocolError> {
     if frame.data.trim() == "[DONE]" {
-        return Ok(None);
+        return Ok(Vec::new());
     }
 
     let body: Value = serde_json::from_str(&frame.data)?;
     match protocol {
-        ProviderProtocol::OpenAiResponses => parse_openai_responses_stream_event(frame, &body),
-        ProviderProtocol::OpenAiChatCompletions => parse_openai_chat_stream_event(&body),
-        ProviderProtocol::ClaudeMessages => parse_claude_stream_event(frame, &body),
-        ProviderProtocol::GeminiGenerateContent => parse_gemini_stream_event(&body),
+        ProviderProtocol::OpenAiResponses => Ok(parse_openai_responses_stream_event(frame, &body)?
+            .into_iter()
+            .collect()),
+        ProviderProtocol::OpenAiChatCompletions => parse_openai_chat_stream_events(&body),
+        ProviderProtocol::ClaudeMessages => Ok(parse_claude_stream_event(frame, &body)?
+            .into_iter()
+            .collect()),
+        ProviderProtocol::GeminiGenerateContent => {
+            Ok(parse_gemini_stream_event(&body)?.into_iter().collect())
+        }
     }
+}
+
+pub fn parse_stream_event(
+    protocol: ProviderProtocol,
+    frame: &ProviderStreamFrame,
+) -> Result<Option<LlmStreamEvent>, ProtocolError> {
+    Ok(select_primary_stream_event(parse_stream_events(
+        protocol, frame,
+    )?))
 }
 
 pub fn emit_stream_event(
@@ -458,6 +473,21 @@ pub fn emit_stream_event(
     Ok(frame)
 }
 
+#[cfg(test)]
+fn transcode_stream_events(
+    from: ProviderProtocol,
+    to: ProviderProtocol,
+    frame: &ProviderStreamFrame,
+) -> Result<Vec<ProviderStreamFrame>, ProtocolError> {
+    let mut frames = Vec::new();
+    for event in parse_stream_events(from, frame)? {
+        if let Some(frame) = emit_stream_event(to, &event)? {
+            frames.push(frame);
+        }
+    }
+    Ok(frames)
+}
+
 pub fn transcode_stream_event(
     from: ProviderProtocol,
     to: ProviderProtocol,
@@ -467,6 +497,19 @@ pub fn transcode_stream_event(
         Some(event) => emit_stream_event(to, &event),
         None => Ok(None),
     }
+}
+
+fn select_primary_stream_event(events: Vec<LlmStreamEvent>) -> Option<LlmStreamEvent> {
+    let mut fallback = None;
+    for event in events {
+        if !matches!(event, LlmStreamEvent::ResponseStarted { .. }) {
+            return Some(event);
+        }
+        if fallback.is_none() {
+            fallback = Some(event);
+        }
+    }
+    fallback
 }
 
 pub(crate) fn emit_request_with_mode(
@@ -1400,72 +1443,72 @@ fn emit_openai_responses_stream_event(
     Ok(Some(frame))
 }
 
-fn parse_openai_chat_stream_event(body: &Value) -> Result<Option<LlmStreamEvent>, ProtocolError> {
-    let choice = match body
+fn parse_openai_chat_stream_events(body: &Value) -> Result<Vec<LlmStreamEvent>, ProtocolError> {
+    let mut events = Vec::new();
+
+    if let Some(choice) = body
         .get("choices")
         .and_then(Value::as_array)
         .and_then(|choices| choices.first())
     {
-        Some(choice) => choice,
-        None => return Ok(None),
-    };
-
-    if let Some(role) = choice
-        .get("delta")
-        .and_then(|value| value.get("role"))
-        .and_then(Value::as_str)
-    {
-        return Ok(Some(LlmStreamEvent::ResponseStarted {
-            response_id: body.get("id").and_then(Value::as_str).map(str::to_owned),
-            model: body
-                .get("model")
-                .and_then(Value::as_str)
-                .unwrap_or(role)
-                .to_string(),
-            provider_protocol: ProviderProtocol::OpenAiChatCompletions,
-        }));
-    }
-
-    if let Some(delta) = choice
-        .get("delta")
-        .and_then(|value| value.get("content"))
-        .and_then(Value::as_str)
-    {
-        return Ok(Some(LlmStreamEvent::TextDelta {
-            delta: delta.to_string(),
-        }));
-    }
-
-    if let Some(tool_calls) = choice
-        .get("delta")
-        .and_then(|value| value.get("tool_calls"))
-        .and_then(Value::as_array)
-    {
-        if let Some(tool_call) = tool_calls.first() {
-            return Ok(Some(LlmStreamEvent::ToolCallDelta {
-                call_id: tool_call
-                    .get("id")
+        if let Some(role) = choice
+            .get("delta")
+            .and_then(|value| value.get("role"))
+            .and_then(Value::as_str)
+        {
+            events.push(LlmStreamEvent::ResponseStarted {
+                response_id: body.get("id").and_then(Value::as_str).map(str::to_owned),
+                model: body
+                    .get("model")
                     .and_then(Value::as_str)
-                    .unwrap_or("")
+                    .unwrap_or(role)
                     .to_string(),
-                name: tool_call
-                    .get("function")
-                    .and_then(|value| value.get("name"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-                delta: tool_call
-                    .get("function")
-                    .and_then(|value| value.get("arguments"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-            }));
+                provider_protocol: ProviderProtocol::OpenAiChatCompletions,
+            });
+        }
+
+        if let Some(delta) = choice
+            .get("delta")
+            .and_then(|value| value.get("content"))
+            .and_then(Value::as_str)
+            .filter(|delta| !delta.is_empty())
+        {
+            events.push(LlmStreamEvent::TextDelta {
+                delta: delta.to_string(),
+            });
+        }
+
+        if let Some(tool_calls) = choice
+            .get("delta")
+            .and_then(|value| value.get("tool_calls"))
+            .and_then(Value::as_array)
+        {
+            for tool_call in tool_calls {
+                events.push(LlmStreamEvent::ToolCallDelta {
+                    call_id: tool_call
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                    name: tool_call
+                        .get("function")
+                        .and_then(|value| value.get("name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                    delta: tool_call
+                        .get("function")
+                        .and_then(|value| value.get("arguments"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                });
+            }
         }
     }
 
     if let Some(usage) = body.get("usage") {
-        return Ok(Some(LlmStreamEvent::Usage {
+        events.push(LlmStreamEvent::Usage {
             usage: TokenUsage {
                 prompt_tokens: usage
                     .get("prompt_tokens")
@@ -1480,10 +1523,10 @@ fn parse_openai_chat_stream_event(body: &Value) -> Result<Option<LlmStreamEvent>
                     .and_then(Value::as_u64)
                     .map(|value| value as u32),
             },
-        }));
+        });
     }
 
-    Ok(None)
+    Ok(events)
 }
 
 fn emit_openai_chat_stream_event(
@@ -3631,6 +3674,125 @@ mod tests {
 
         assert_eq!(transcoded.event.as_deref(), Some("content_block_delta"));
         let body: Value = serde_json::from_str(&transcoded.data).expect("parse frame body");
+        assert_eq!(body["delta"]["text"], "Hel");
+    }
+
+    #[test]
+    fn parse_openai_chat_stream_events_preserves_started_and_text_delta() {
+        let frame = ProviderStreamFrame {
+            event: None,
+            data: json!({
+                "id": "chatcmpl_123",
+                "model": "gpt-4.1-mini",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "content": "Hel"
+                    }
+                }]
+            })
+            .to_string(),
+        };
+
+        let events = parse_stream_events(ProviderProtocol::OpenAiChatCompletions, &frame)
+            .expect("parse stream events");
+
+        assert_eq!(events.len(), 2);
+        assert!(matches!(
+            &events[0],
+            LlmStreamEvent::ResponseStarted {
+                response_id,
+                model,
+                provider_protocol,
+            } if response_id.as_deref() == Some("chatcmpl_123")
+                && model == "gpt-4.1-mini"
+                && *provider_protocol == ProviderProtocol::OpenAiChatCompletions
+        ));
+        assert!(matches!(
+            &events[1],
+            LlmStreamEvent::TextDelta { delta } if delta == "Hel"
+        ));
+
+        let primary = parse_stream_event(ProviderProtocol::OpenAiChatCompletions, &frame)
+            .expect("parse primary stream event")
+            .expect("expected primary event");
+        assert!(matches!(
+            primary,
+            LlmStreamEvent::TextDelta { delta } if delta == "Hel"
+        ));
+    }
+
+    #[test]
+    fn parse_openai_chat_usage_chunk_without_choices() {
+        let frame = ProviderStreamFrame {
+            event: None,
+            data: json!({
+                "id": "chatcmpl_123",
+                "choices": [],
+                "usage": {
+                    "prompt_tokens": 11,
+                    "completion_tokens": 7,
+                    "total_tokens": 18
+                }
+            })
+            .to_string(),
+        };
+
+        let events = parse_stream_events(ProviderProtocol::OpenAiChatCompletions, &frame)
+            .expect("parse stream events");
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            &events[0],
+            LlmStreamEvent::Usage { usage }
+                if usage.prompt_tokens == 11
+                    && usage.completion_tokens == 7
+                    && usage.total_tokens == Some(18)
+        ));
+
+        let primary = parse_stream_event(ProviderProtocol::OpenAiChatCompletions, &frame)
+            .expect("parse primary stream event")
+            .expect("expected usage event");
+        assert!(matches!(
+            primary,
+            LlmStreamEvent::Usage { usage }
+                if usage.prompt_tokens == 11
+                    && usage.completion_tokens == 7
+                    && usage.total_tokens == Some(18)
+        ));
+    }
+
+    #[test]
+    fn transcode_stream_events_openai_chat_to_claude_preserves_started_and_text_delta() {
+        let frame = ProviderStreamFrame {
+            event: None,
+            data: json!({
+                "id": "chatcmpl_123",
+                "model": "gpt-4.1-mini",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "content": "Hel"
+                    }
+                }]
+            })
+            .to_string(),
+        };
+
+        let transcoded = transcode_stream_events(
+            ProviderProtocol::OpenAiChatCompletions,
+            ProviderProtocol::ClaudeMessages,
+            &frame,
+        )
+        .expect("transcode stream events");
+
+        assert_eq!(transcoded.len(), 2);
+        assert_eq!(transcoded[0].event.as_deref(), Some("message_start"));
+        assert_eq!(transcoded[1].event.as_deref(), Some("content_block_delta"));
+
+        let body: Value =
+            serde_json::from_str(&transcoded[1].data).expect("parse content block frame body");
         assert_eq!(body["delta"]["text"], "Hel");
     }
 

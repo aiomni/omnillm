@@ -67,6 +67,8 @@ example:
 - build a `GatewayBuilder` flow
 - configure an `EndpointProtocol::*_compat` endpoint for a wrapper that
   requires `messages[].content[]` arrays
+- debug an OpenAI Chat compat stream where `delta.role` and the first
+  `delta.content` arrive in the same SSE frame
 - pass through wrapper-specific OpenAI top-level fields such as
   `enable_thinking` via `LlmRequest.vendor_extensions`
 - explain when `Gateway` is the right surface versus `transcode_*`

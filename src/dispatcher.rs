@@ -10,7 +10,7 @@ use reqwest::{Client, StatusCode};
 use crate::error::{ApiError, ProviderError};
 use crate::key::lease::KeyLease;
 use crate::protocol::{
-    emit_request_with_mode, parse_error, parse_response, parse_stream_event, take_sse_frames,
+    emit_request_with_mode, parse_error, parse_response, parse_stream_events, take_sse_frames,
     AuthScheme, ProtocolError, ProviderEndpoint, ProviderProtocol,
 };
 use crate::types::{LlmRequest, LlmResponse, LlmStreamEvent};
@@ -93,9 +93,7 @@ impl Dispatcher {
                 buffer.push_str(&String::from_utf8_lossy(&chunk));
 
                 for frame in take_sse_frames(&mut buffer) {
-                    if let Some(event) =
-                        parse_stream_event(protocol, &frame).map_err(protocol_to_api)?
-                    {
+                    for event in parse_stream_events(protocol, &frame).map_err(protocol_to_api)? {
                         yield event;
                     }
                 }
@@ -107,9 +105,7 @@ impl Dispatcher {
                     event: None,
                     data: tail.to_string(),
                 };
-                if let Some(event) =
-                    parse_stream_event(protocol, &frame).map_err(protocol_to_api)?
-                {
+                for event in parse_stream_events(protocol, &frame).map_err(protocol_to_api)? {
                     yield event;
                 }
             }
