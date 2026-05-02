@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-002
 title: Implement P1 OpenAI primitive HTTP gaps
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, openai, http]
 project: primitive-provider-scope-expansion
@@ -22,11 +22,11 @@ OpenAI primitive support covers core generation/media endpoints but P1 low-risk 
 - Classify models metadata as zero-cost, uploads/files as upload/storage, and media endpoints as billable-unit or reserved-estimate fallback.
 
 # Execution Steps
-- [ ] Add OpenAI primitive registry entries or path coverage for Files, Uploads, Models, Audio Translations, image edits, and image variations.
-- [ ] Add default path resolution and explicit-path override tests for each endpoint family.
-- [ ] Add request preservation tests for JSON, multipart, binary, and text bodies where applicable.
-- [ ] Add response preservation tests for JSON and binary/text responses.
-- [ ] Add budget settlement tests for zero-cost metadata, upload/storage, and billable-unit fallback.
+- [x] Add OpenAI primitive registry entries or path coverage for Files, Uploads, Models, Audio Translations, image edits, and image variations.
+- [x] Add default path resolution and explicit-path override tests for each endpoint family.
+- [x] Add request preservation tests for JSON, multipart, binary, and text bodies where applicable.
+- [x] Add response preservation tests for JSON and binary/text responses.
+- [x] Add budget settlement tests for zero-cost metadata, upload/storage, and billable-unit fallback.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -45,10 +45,15 @@ OpenAI primitive support covers core generation/media endpoints but P1 low-risk 
 - Recommended action: prefer explicit path support when provider URL shape varies by version.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Added OpenAI P1 primitive wire formats and endpoint coverage for Files, Uploads, Models, Audio Translations, image edits, and image variations.
+- Added default path coverage and budget-class tests for metadata, upload/storage, and media billable-unit fallback.
+- Validation: `cargo fmt` and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; OpenAI P1 HTTP gap acceptance criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source spec tier: `support_tiers.p1_low_risk_http_gaps.OpenAi`.

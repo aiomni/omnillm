@@ -16,8 +16,8 @@ use crate::key::inner::KeyInner;
 use crate::key::pool::{KeyPool, KeyStatus};
 use crate::pricing;
 use crate::primitive::{
-    PrimitiveProviderEndpoint, PrimitiveRealtimeSession, PrimitiveRequest, PrimitiveResponse,
-    PrimitiveStreamEvent, PrimitiveStreamMode,
+    PrimitiveBudgetClass, PrimitiveProviderEndpoint, PrimitiveRealtimeSession, PrimitiveRequest,
+    PrimitiveResponse, PrimitiveStreamEvent, PrimitiveStreamMode,
 };
 use crate::protocol::ProviderEndpoint;
 use crate::types::{LlmRequest, LlmResponse, LlmStreamEvent, Message, MessageRole};
@@ -235,7 +235,7 @@ impl Gateway {
     ) -> Result<PrimitiveResponse, GatewayError> {
         self.ensure_primitive_supported(&req)?;
         let est_tokens = req.estimated_tokens();
-        let est_cost = pricing::estimate(est_tokens, req.model_name());
+        let est_cost = primitive_estimated_cost(&req);
 
         let lease = self
             .pool
@@ -299,7 +299,7 @@ impl Gateway {
         }
 
         let est_tokens = req.estimated_tokens();
-        let est_cost = pricing::estimate(est_tokens, req.model_name());
+        let est_cost = primitive_estimated_cost(&req);
 
         let lease = self
             .pool
@@ -546,6 +546,16 @@ impl GatewayBuilder {
         }
 
         builder.build()
+    }
+}
+
+fn primitive_estimated_cost(req: &PrimitiveRequest) -> u64 {
+    match req.budget_class() {
+        PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost
+        | PrimitiveBudgetClass::UploadOrStorage => 0,
+        PrimitiveBudgetClass::TokenMetered | PrimitiveBudgetClass::BillableUnitMetered => {
+            pricing::estimate(req.estimated_tokens(), req.model_name())
+        }
     }
 }
 

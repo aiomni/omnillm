@@ -51,8 +51,10 @@ pub enum PrimitiveEndpointKind {
     Images,
     Realtime,
     AudioTranscriptions,
+    AudioTranslations,
     AudioSpeech,
     Embeddings,
+    Uploads,
     Messages,
     CountTokens,
     Batches,
@@ -71,9 +73,15 @@ pub enum ProviderPrimitiveWireFormat {
     OpenAiChatCompletions,
     OpenAiImages,
     OpenAiRealtime,
+    OpenAiImageEdits,
+    OpenAiImageVariations,
     OpenAiAudioTranscriptions,
+    OpenAiAudioTranslations,
     OpenAiAudioSpeech,
     OpenAiEmbeddings,
+    OpenAiFiles,
+    OpenAiUploads,
+    OpenAiModels,
     AnthropicMessages,
     AnthropicCountTokens,
     AnthropicMessageBatches,
@@ -163,6 +171,34 @@ impl PrimitiveRequest {
             stream: PrimitiveStreamMode::None,
             metadata: BTreeMap::new(),
         }
+    }
+
+    pub fn get(
+        provider: PrimitiveProviderKind,
+        endpoint: PrimitiveEndpointKind,
+        wire_format: ProviderPrimitiveWireFormat,
+        model: Option<impl Into<String>>,
+    ) -> Self {
+        Self {
+            provider,
+            endpoint,
+            wire_format,
+            model: model.map(Into::into),
+            method: HttpMethod::Get,
+            path: None,
+            query: BTreeMap::new(),
+            headers: BTreeMap::new(),
+            accept: None,
+            body: RequestBody::Text {
+                text: String::new(),
+            },
+            stream: PrimitiveStreamMode::None,
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    pub fn budget_class(&self) -> PrimitiveBudgetClass {
+        infer_budget_class(self.endpoint, &[self.wire_format])
     }
 
     pub fn with_path(mut self, path: impl Into<String>) -> Self {
@@ -530,7 +566,11 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                     support(
                         PrimitiveEndpointKind::Images,
                         SupportLevel::Native,
-                        &[ProviderPrimitiveWireFormat::OpenAiImages],
+                        &[
+                            ProviderPrimitiveWireFormat::OpenAiImages,
+                            ProviderPrimitiveWireFormat::OpenAiImageEdits,
+                            ProviderPrimitiveWireFormat::OpenAiImageVariations,
+                        ],
                         &[PrimitiveStreamMode::None],
                     ),
                     support(
@@ -546,6 +586,12 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         &[PrimitiveStreamMode::None, PrimitiveStreamMode::Sse],
                     ),
                     support(
+                        PrimitiveEndpointKind::AudioTranslations,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::OpenAiAudioTranslations],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
                         PrimitiveEndpointKind::AudioSpeech,
                         SupportLevel::Native,
                         &[ProviderPrimitiveWireFormat::OpenAiAudioSpeech],
@@ -555,6 +601,24 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         PrimitiveEndpointKind::Embeddings,
                         SupportLevel::Native,
                         &[ProviderPrimitiveWireFormat::OpenAiEmbeddings],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
+                        PrimitiveEndpointKind::Files,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::OpenAiFiles],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
+                        PrimitiveEndpointKind::Uploads,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::OpenAiUploads],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
+                        PrimitiveEndpointKind::Models,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::OpenAiModels],
                         &[PrimitiveStreamMode::None],
                     ),
                 ],
@@ -858,6 +922,7 @@ fn infer_scope_tier(
         PrimitiveEndpointKind::Files
             | PrimitiveEndpointKind::Models
             | PrimitiveEndpointKind::Caches
+            | PrimitiveEndpointKind::Uploads
     ) {
         return PrimitiveSupportTier::P1LowRiskHttpGaps;
     }
@@ -884,7 +949,10 @@ fn infer_budget_class(
         return PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost;
     }
 
-    if matches!(endpoint, PrimitiveEndpointKind::Files) {
+    if matches!(
+        endpoint,
+        PrimitiveEndpointKind::Files | PrimitiveEndpointKind::Uploads
+    ) {
         return PrimitiveBudgetClass::UploadOrStorage;
     }
 
@@ -901,7 +969,10 @@ fn infer_budget_class(
         matches!(
             wire_format,
             ProviderPrimitiveWireFormat::OpenAiImages
+                | ProviderPrimitiveWireFormat::OpenAiImageEdits
+                | ProviderPrimitiveWireFormat::OpenAiImageVariations
                 | ProviderPrimitiveWireFormat::OpenAiAudioTranscriptions
+                | ProviderPrimitiveWireFormat::OpenAiAudioTranslations
                 | ProviderPrimitiveWireFormat::OpenAiAudioSpeech
         )
     }) {
@@ -943,12 +1014,18 @@ fn default_path(request: &PrimitiveRequest) -> Option<String> {
             Some("/chat/completions".into())
         }
         ProviderPrimitiveWireFormat::OpenAiImages => Some("/images/generations".into()),
+        ProviderPrimitiveWireFormat::OpenAiImageEdits => Some("/images/edits".into()),
+        ProviderPrimitiveWireFormat::OpenAiImageVariations => Some("/images/variations".into()),
         ProviderPrimitiveWireFormat::OpenAiRealtime => Some("/realtime/sessions".into()),
         ProviderPrimitiveWireFormat::OpenAiAudioTranscriptions => {
             Some("/audio/transcriptions".into())
         }
+        ProviderPrimitiveWireFormat::OpenAiAudioTranslations => Some("/audio/translations".into()),
         ProviderPrimitiveWireFormat::OpenAiAudioSpeech => Some("/audio/speech".into()),
         ProviderPrimitiveWireFormat::OpenAiEmbeddings => Some("/embeddings".into()),
+        ProviderPrimitiveWireFormat::OpenAiFiles => Some("/files".into()),
+        ProviderPrimitiveWireFormat::OpenAiUploads => Some("/uploads".into()),
+        ProviderPrimitiveWireFormat::OpenAiModels => Some("/models".into()),
         ProviderPrimitiveWireFormat::AnthropicMessages => Some("/messages".into()),
         ProviderPrimitiveWireFormat::AnthropicCountTokens => Some("/messages/count_tokens".into()),
         ProviderPrimitiveWireFormat::AnthropicMessageBatches => Some("/messages/batches".into()),

@@ -78,8 +78,10 @@ primitive_types:
       - Images
       - Realtime
       - AudioTranscriptions
+      - AudioTranslations
       - AudioSpeech
       - Embeddings
+      - Uploads
       - Messages
       - CountTokens
       - Batches
@@ -94,10 +96,16 @@ primitive_types:
       - OpenAiResponses
       - OpenAiChatCompletions
       - OpenAiImages
+      - OpenAiImageEdits
+      - OpenAiImageVariations
       - OpenAiRealtime
       - OpenAiAudioTranscriptions
+      - OpenAiAudioTranslations
       - OpenAiAudioSpeech
       - OpenAiEmbeddings
+      - OpenAiFiles
+      - OpenAiUploads
+      - OpenAiModels
       - AnthropicMessages
       - AnthropicCountTokens
       - AnthropicMessageBatches
@@ -169,8 +177,11 @@ provider_api_families:
     expansion:
       - Embeddings
       - Files
+      - Uploads
       - Batches
       - Models
+      - AudioTranslations
+      - ImagesEditsAndVariationsPathCoverage
   AzureOpenAi:
     required:
       - Responses

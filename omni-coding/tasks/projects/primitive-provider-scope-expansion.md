@@ -21,7 +21,7 @@
 
 ## Current State
 - Done: scope guardrails and registry vocabulary hardening.
-- Todo: P1 OpenAI low-risk HTTP gaps.
+- Done: P1 OpenAI low-risk HTTP gaps.
 - Todo: P1 Anthropic metadata/files hardening.
 - Todo: P1 Gemini metadata/operations/files/caches hardening.
 - Todo: P1 docs/examples/support matrix sync.

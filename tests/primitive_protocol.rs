@@ -2,10 +2,10 @@ use std::{io, time::Duration};
 
 use futures_util::StreamExt;
 use omnillm::{
-    embedded_primitive_provider_registry, GatewayBuilder, GatewayError, KeyConfig,
-    PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveProviderEndpoint, PrimitiveProviderKind,
-    PrimitiveRequest, PrimitiveStreamEvent, PrimitiveStreamMode, PrimitiveSupportTier,
-    ProviderEndpoint, ProviderPrimitiveWireFormat, ResponseBody,
+    embedded_primitive_provider_registry, GatewayBuilder, GatewayError, KeyConfig, MultipartField,
+    MultipartValue, PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
+    PrimitiveProviderKind, PrimitiveRequest, PrimitiveStreamEvent, PrimitiveStreamMode,
+    PrimitiveSupportTier, ProviderEndpoint, ProviderPrimitiveWireFormat, RequestBody, ResponseBody,
 };
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -100,6 +100,128 @@ fn primitive_public_model_roundtrips_without_canonical_shape() {
         serde_json::from_str(&encoded).expect("decode primitive request");
     assert_eq!(decoded.provider, PrimitiveProviderKind::Anthropic);
     assert_eq!(decoded.endpoint, PrimitiveEndpointKind::Messages);
+}
+
+#[tokio::test]
+async fn primitive_openai_p1_http_gaps_resolve_paths_and_budget_classes() {
+    let registry = embedded_primitive_provider_registry();
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiFiles,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiUploads,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiModels,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiImageEdits,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiAudioTranslations,
+        PrimitiveStreamMode::None,
+    ));
+
+    let models = PrimitiveRequest::get(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::Models,
+        ProviderPrimitiveWireFormat::OpenAiModels,
+        Option::<String>::None,
+    );
+    assert_eq!(
+        models.budget_class(),
+        PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost
+    );
+    let (response, raw_request, used_usd) =
+        call_and_capture_openai(models, json!({"data":[]})).await;
+    assert_eq!(response.status, 200);
+    assert!(raw_request.starts_with("GET /models HTTP/1.1"));
+    assert_eq!(used_usd, 0.0);
+
+    let file_upload = PrimitiveRequest {
+        provider: PrimitiveProviderKind::OpenAi,
+        endpoint: PrimitiveEndpointKind::Files,
+        wire_format: ProviderPrimitiveWireFormat::OpenAiFiles,
+        model: None,
+        method: omnillm::HttpMethod::Post,
+        path: None,
+        query: Default::default(),
+        headers: Default::default(),
+        accept: None,
+        body: RequestBody::Multipart {
+            fields: vec![
+                MultipartField {
+                    name: "purpose".into(),
+                    value: MultipartValue::Text {
+                        value: "batch".into(),
+                    },
+                },
+                MultipartField {
+                    name: "file".into(),
+                    value: MultipartValue::File {
+                        filename: "input.jsonl".into(),
+                        data_base64: "e30K".into(),
+                        media_type: Some("application/jsonl".into()),
+                    },
+                },
+            ],
+        },
+        stream: PrimitiveStreamMode::None,
+        metadata: Default::default(),
+    };
+    assert_eq!(
+        file_upload.budget_class(),
+        PrimitiveBudgetClass::UploadOrStorage
+    );
+    let (_, raw_request, used_usd) =
+        call_and_capture_openai(file_upload, json!({"id":"file_1"})).await;
+    assert!(raw_request.starts_with("POST /files HTTP/1.1"));
+    assert!(raw_request.contains("name=\"purpose\""));
+    assert_eq!(used_usd, 0.0);
+
+    let image_edit = PrimitiveRequest {
+        provider: PrimitiveProviderKind::OpenAi,
+        endpoint: PrimitiveEndpointKind::Images,
+        wire_format: ProviderPrimitiveWireFormat::OpenAiImageEdits,
+        model: Some("gpt-image-1".into()),
+        method: omnillm::HttpMethod::Post,
+        path: None,
+        query: Default::default(),
+        headers: Default::default(),
+        accept: None,
+        body: RequestBody::Multipart { fields: Vec::new() },
+        stream: PrimitiveStreamMode::None,
+        metadata: Default::default(),
+    };
+    let (_, raw_request, used_usd) = call_and_capture_openai(image_edit, json!({"data":[]})).await;
+    assert!(raw_request.starts_with("POST /images/edits HTTP/1.1"));
+    assert!(used_usd > 0.0);
+
+    let translation = PrimitiveRequest {
+        provider: PrimitiveProviderKind::OpenAi,
+        endpoint: PrimitiveEndpointKind::AudioTranslations,
+        wire_format: ProviderPrimitiveWireFormat::OpenAiAudioTranslations,
+        model: Some("whisper-1".into()),
+        method: omnillm::HttpMethod::Post,
+        path: None,
+        query: Default::default(),
+        headers: Default::default(),
+        accept: None,
+        body: RequestBody::Multipart { fields: Vec::new() },
+        stream: PrimitiveStreamMode::None,
+        metadata: Default::default(),
+    };
+    let (_, raw_request, _) = call_and_capture_openai(translation, json!({"text":"hello"})).await;
+    assert!(raw_request.starts_with("POST /audio/translations HTTP/1.1"));
 }
 
 #[tokio::test]
@@ -514,6 +636,29 @@ async fn primitive_realtime_is_explicit_scaffold() {
         .await
         .expect_err("realtime is scaffolded");
     assert!(matches!(err, GatewayError::Protocol(_)));
+}
+
+async fn call_and_capture_openai(
+    request: PrimitiveRequest,
+    provider_response: serde_json::Value,
+) -> (omnillm::PrimitiveResponse, String, f64) {
+    let (base_url, server) = spawn_server(
+        200,
+        Some("application/json"),
+        provider_response.to_string().into_bytes(),
+    )
+    .await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let response = gateway
+        .primitive_call(request, CancellationToken::new())
+        .await
+        .expect("primitive call succeeds");
+    let used_usd = gateway.budget_used_usd();
+    let raw_request = server.await.expect("server joins").expect("server ok");
+    (response, raw_request, used_usd)
 }
 
 async fn call_once(
