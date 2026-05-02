@@ -1,0 +1,29 @@
+op: create
+target: capability.file.write
+reason: 初始化 file write capability
+
+spec:
+  id: capability.file.write
+  kind: capability
+  version: 1
+  status: current
+  summary: 写入 workspace 内的文件内容
+  input:
+    path: string
+    content: string
+  output:
+    written: boolean
+  constraints:
+    max_size: 1MB
+    scope: workspace-only
+  invariants:
+    - must_be_atomic
+    - must_be_idempotent
+  semantics:
+    must_be_atomic: write is all-or-nothing
+    must_be_idempotent: same input produces same final file content
+  relations:
+    depends_on:
+      - system.workspace
+    extends: []
+    constrains: []

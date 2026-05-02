@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "writing-plan": {
+      "source": "aiomni/omni-skills",
+      "sourceType": "github",
+      "computedHash": "26068fb2fde1b5dc7364d85926e1d5dcde8a4b8ac2de61984227aa7f65ae7c62"
+    },
+    "writing-spec": {
+      "source": "aiomni/omni-skills",
+      "sourceType": "github",
+      "computedHash": "ecf68dea2fa5176e4308aa53d2df1a6f6e1d469b97104c635961ae300d3e74c7"
+    },
+    "writing-tasks": {
+      "source": "aiomni/omni-skills",
+      "sourceType": "github",
+      "computedHash": "5e53b65a4cb8ed0fa9d3e9259baba82b03a40b15897934b25165ef4966f714cb"
+    }
+  }
+}

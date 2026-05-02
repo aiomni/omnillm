@@ -1,0 +1,31 @@
+id: contract.files
+kind: contract
+version: 1
+status: current
+summary: 文件能力对外暴露的 request/response contract
+
+endpoints:
+  write:
+    capability: capability.file.write
+    request:
+      path: string
+      content: string
+    response:
+      written: boolean
+
+constraints:
+  compatibility: backward-compatible-by-default
+
+invariants:
+  - request_must_match_capability_input
+  - response_must_match_capability_output
+
+semantics:
+  request_must_match_capability_input: write request fields must stay aligned with capability.file.write input
+  response_must_match_capability_output: write response fields must stay aligned with capability.file.write output
+
+relations:
+  depends_on:
+    - capability.file.write
+  extends: []
+  constrains: []

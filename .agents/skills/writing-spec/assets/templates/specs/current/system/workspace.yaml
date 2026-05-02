@@ -1,0 +1,22 @@
+id: system.workspace
+kind: system
+version: 1
+status: current
+summary: 定义 workspace 边界和文件访问规则
+
+constraints:
+  root: project-workspace
+  path_scope: workspace-only
+  forbid_parent_escape: true
+
+invariants:
+  - paths_must_be_normalized
+  - writes_must_not_escape_workspace
+
+semantics:
+  writes_must_not_escape_workspace: writes must stay under the configured workspace root
+
+relations:
+  depends_on: []
+  extends: []
+  constrains: []

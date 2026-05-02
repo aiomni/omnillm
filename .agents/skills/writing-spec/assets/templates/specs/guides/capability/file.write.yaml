@@ -1,0 +1,11 @@
+id: guide.capability.file.write
+kind: guide
+target: capability.file.write
+summary: 写文件到 workspace
+notes:
+  - Use atomic write to avoid partial output.
+  - Workspace boundaries come from system.workspace.
+examples:
+  - input:
+      path: a.txt
+      content: hi
