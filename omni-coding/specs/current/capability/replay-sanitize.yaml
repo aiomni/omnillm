@@ -1,0 +1,108 @@
+id: capability.replay.sanitize
+kind: capability
+version: 1
+status: current
+summary: Replay fixture 的默认脱敏与二进制清洗
+
+sources:
+  modules:
+    - src/replay.rs
+
+input:
+  ReplayFixture::sanitized:
+    fixture: ReplayFixture
+  sanitize_transport_request:
+    request: TransportRequest
+  sanitize_transport_response:
+    response: TransportResponse
+  sanitize_json_value:
+    value: serde_json::Value
+
+output:
+  ReplayFixture::sanitized: ReplayFixture
+  sanitize_transport_request: TransportRequest
+  sanitize_transport_response: TransportResponse
+  sanitize_json_value: serde_json::Value
+
+fixture_schema:
+  ReplayFixture:
+    wire_format: WireFormat
+    request: TransportRequest
+    response: TransportResponse
+
+sanitization:
+  request:
+    path_query: redact_sensitive_query_values
+    headers: redact_sensitive_header_values
+    body_json: recursive_json_sanitize
+    body_multipart_text: sanitize_text_field_by_field_name
+    body_multipart_file: redact_file_data_base64
+    body_text: sanitize_text_field_with_body_label
+    body_binary: redact_binary_data_base64
+  response:
+    headers: redact_sensitive_header_values
+    body_json: recursive_json_sanitize
+    body_text: preserve_text
+    body_binary: redact_binary_data_base64
+  json:
+    object: sanitize_each_value_by_key
+    array: sanitize_each_item
+    scalar: preserve_value
+
+sensitive_keys:
+  - authorization
+  - proxy-authorization
+  - x-api-key
+  - api-key
+  - x-goog-api-key
+  - cookie
+  - set-cookie
+  - api_key
+  - apikey
+  - access_token
+  - token
+  - secret
+  - password
+  - key
+  - ak
+
+blob_keys:
+  - data_base64
+  - image_base64
+  - b64_json
+  - audio_base64
+
+redaction_formats:
+  sensitive_value: "<redacted:{label}>"
+  blob_value: "<redacted:{label}_blob>"
+  binary_request: "<redacted:binary_blob>"
+  multipart_file: "<redacted:file_blob>"
+
+constraints:
+  key_matching_is_ascii_lowercase: true
+  query_parameter_order_is_preserved_after_filtering_empty_parts: true
+  path_without_query_is_preserved: true
+  response_text_body_is_not_redacted: true
+
+invariants:
+  - secrets_are_not_preserved_in_headers_query_or_json
+  - blob_payloads_are_not_preserved
+  - non_sensitive_json_scalars_are_preserved
+  - sanitized_fixture_preserves_wire_format
+  - sanitized_fixture_sanitizes_request_and_response
+  - response_binary_payload_is_redacted
+
+semantics:
+  secrets_are_not_preserved_in_headers_query_or_json: sensitive_keys 命中的字段值替换为 sensitive_value 格式。
+  blob_payloads_are_not_preserved: blob_keys 命中的 JSON 值替换为 blob_value 格式。
+  non_sensitive_json_scalars_are_preserved: 未命中的 scalar 原样复制。
+  sanitized_fixture_preserves_wire_format: ReplayFixture::sanitized 不改变 wire_format。
+  sanitized_fixture_sanitizes_request_and_response: ReplayFixture::sanitized 同时清洗 request 与 response。
+  response_binary_payload_is_redacted: ResponseBody::Binary 的 data_base64 不保留原值。
+
+relations:
+  depends_on:
+    - contract.multi_endpoint.model
+  extends: []
+  constrains: []
+

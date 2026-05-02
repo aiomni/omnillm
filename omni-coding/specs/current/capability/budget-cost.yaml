@@ -1,0 +1,103 @@
+id: capability.budget.cost
+kind: capability
+version: 2
+status: current
+summary: 请求成本估算、预算预留与结算
+
+sources:
+  modules:
+    - src/budget/tracker.rs
+    - src/budget/mod.rs
+    - src/pricing.rs
+
+units:
+  MicroDollar: u64
+  usd_to_micro_factor: 1000000
+
+input:
+  BudgetTracker::new:
+    limit_usd: f64
+  BudgetTracker::try_reserve:
+    estimated: MicroDollar
+  BudgetTracker::settle:
+    estimated: MicroDollar
+    actual: MicroDollar
+  pricing::estimate:
+    tokens: u32
+    model: string
+  pricing::actual:
+    usage: TokenUsage
+    model: string
+
+output:
+  BudgetTracker::try_reserve: bool
+  BudgetTracker::used_usd: f64
+  BudgetTracker::limit_usd: f64
+  BudgetTracker::remaining_usd: f64
+  pricing::estimate: MicroDollar
+  pricing::actual: MicroDollar
+
+budget_algorithm:
+  storage: AtomicU64
+  reserve: compare_exchange_weak_loop
+  reserve_reject_condition: current_used + estimated > limit
+  settle_when_actual_greater: fetch_add(actual - estimated)
+  settle_when_actual_lesser_or_equal: fetch_sub(estimated - actual)
+  error_refund_value: actual_zero
+
+pricing:
+  estimate_formula: tokens * input_per_1k / 1000
+  actual_formula: prompt_tokens * input_per_1k / 1000 + completion_tokens * output_per_1k / 1000
+  model_prefix_rates_usd_per_1k:
+    gpt-4o-mini:
+      input: 0.000150
+      output: 0.000600
+    gpt-4o:
+      input: 0.005
+      output: 0.015
+    claude-3-5-sonnet:
+      input: 0.003
+      output: 0.015
+    claude-3-haiku:
+      input: 0.00025
+      output: 0.00125
+  unknown_model_rate: gpt-4o
+
+prompt_cache_pricing_state:
+  typed_cache_usage_accounting: implemented_by_contract.prompt_cache.policy
+  current_estimate_behavior: no_cache_discount
+  current_actual_behavior: cache_aware_when_telemetry_and_rate_exist
+  actual_requires:
+    - canonical_prompt_cache_usage
+    - provider_specific_cache_read_rate_or_cached_input_rate
+    - provider_specific_cache_write_rate_when_creation_tokens_exist
+  fallback_behavior: uncached_prompt_and_completion_rates
+
+constraints:
+  cost_storage_is_fixed_point: true
+  budget_tracker_is_lock_free: true
+  estimate_uses_input_rate: true
+  unknown_model_is_conservative_default: true
+
+invariants:
+  - failed_reserve_does_not_modify_used
+  - full_refund_returns_used_to_previous_value
+  - actual_cost_can_adjust_reservation_up_or_down
+  - remaining_budget_saturates_at_zero
+  - floating_point_is_not_used_for_atomic_storage
+
+semantics:
+  failed_reserve_does_not_modify_used: 超出预算时 try_reserve 返回 false 且 used 不变。
+  full_refund_returns_used_to_previous_value: settle(estimated, 0) 撤销本次预留成本。
+  actual_cost_can_adjust_reservation_up_or_down: 真实成本高于估算时补记，低于估算时退款。
+  remaining_budget_saturates_at_zero: remaining_usd 使用 saturating_sub 避免负值。
+  floating_point_is_not_used_for_atomic_storage: USD 只在边界转换，内部用 MicroDollar。
+
+relations:
+  depends_on:
+    - contract.generation.model
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - contract.prompt_cache.policy
+

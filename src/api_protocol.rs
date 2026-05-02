@@ -15,7 +15,9 @@ use crate::protocol::{
     emit_request, emit_request_with_mode, emit_response, parse_request, parse_response,
     ProtocolError, ProviderProtocol,
 };
-use crate::types::{BuiltinTool, LlmRequest, VendorExtensions};
+use crate::types::{
+    BuiltinTool, CacheBreakpoint, LlmRequest, MessageRole, PromptCachePolicy, VendorExtensions,
+};
 
 /// Error returned by the multi-endpoint conversion layer.
 #[derive(Debug, Error)]
@@ -126,7 +128,7 @@ pub fn emit_api_request(
                         expected: EndpointKind::Responses,
                         actual: request.canonical_endpoint_kind(),
                     })?;
-            let (sanitized, loss_reasons) = sanitize_generation_request(wire_format, &request);
+            let (sanitized, loss_reasons) = sanitize_generation_request(wire_format, &request)?;
             let raw = emit_request(protocol, &sanitized)?;
             Ok(generation_string_report(wire_format, raw, loss_reasons))
         }
@@ -362,7 +364,7 @@ pub fn emit_transport_request(
                         expected: EndpointKind::Responses,
                         actual: request.canonical_endpoint_kind(),
                     })?;
-            let (sanitized, loss_reasons) = sanitize_generation_request(wire_format, &request);
+            let (sanitized, loss_reasons) = sanitize_generation_request(wire_format, &request)?;
             let body: Value =
                 serde_json::from_str(&emit_request_with_mode(protocol, &sanitized, false)?)?;
             let transport = TransportRequest {
@@ -563,7 +565,7 @@ fn generation_request_report(
     value: ApiRequest,
     loss_reasons: Vec<String>,
 ) -> ConversionReport<ApiRequest> {
-    if wire_format == WireFormat::OpenAiResponses {
+    if wire_format == WireFormat::OpenAiResponses && loss_reasons.is_empty() {
         ConversionReport::native(value, EndpointKind::Responses, wire_format)
     } else {
         ConversionReport::bridged(value, EndpointKind::Responses, wire_format, loss_reasons)
@@ -575,7 +577,7 @@ fn generation_response_report(
     value: ApiResponse,
     loss_reasons: Vec<String>,
 ) -> ConversionReport<ApiResponse> {
-    if wire_format == WireFormat::OpenAiResponses {
+    if wire_format == WireFormat::OpenAiResponses && loss_reasons.is_empty() {
         ConversionReport::native(value, EndpointKind::Responses, wire_format)
     } else {
         ConversionReport::bridged(value, EndpointKind::Responses, wire_format, loss_reasons)
@@ -587,7 +589,7 @@ fn generation_string_report(
     value: String,
     loss_reasons: Vec<String>,
 ) -> ConversionReport<String> {
-    if wire_format == WireFormat::OpenAiResponses {
+    if wire_format == WireFormat::OpenAiResponses && loss_reasons.is_empty() {
         ConversionReport::native(value, EndpointKind::Responses, wire_format)
     } else {
         ConversionReport::bridged(value, EndpointKind::Responses, wire_format, loss_reasons)
@@ -599,7 +601,7 @@ fn generation_transport_report(
     value: TransportRequest,
     loss_reasons: Vec<String>,
 ) -> ConversionReport<TransportRequest> {
-    if wire_format == WireFormat::OpenAiResponses {
+    if wire_format == WireFormat::OpenAiResponses && loss_reasons.is_empty() {
         ConversionReport::native(value, EndpointKind::Responses, wire_format)
     } else {
         ConversionReport::bridged(value, EndpointKind::Responses, wire_format, loss_reasons)
@@ -609,7 +611,7 @@ fn generation_transport_report(
 fn sanitize_generation_request(
     wire_format: WireFormat,
     request: &LlmRequest,
-) -> (LlmRequest, Vec<String>) {
+) -> Result<(LlmRequest, Vec<String>), ApiProtocolError> {
     let mut sanitized = request.clone();
     let mut loss_reasons = Vec::new();
 
@@ -701,6 +703,8 @@ fn sanitize_generation_request(
         ));
     }
 
+    sanitize_prompt_cache_policy(wire_format, &mut sanitized, &mut loss_reasons)?;
+
     if request_has_unemitted_vendor_extensions(wire_format, request) {
         loss_reasons.push(format!(
             "some vendor_extensions and raw_message fields are not emitted to {}",
@@ -708,7 +712,131 @@ fn sanitize_generation_request(
         ));
     }
 
-    (sanitized, dedupe_loss_reasons(loss_reasons))
+    Ok((sanitized, dedupe_loss_reasons(loss_reasons)))
+}
+
+fn sanitize_prompt_cache_policy(
+    wire_format: WireFormat,
+    request: &mut LlmRequest,
+    loss_reasons: &mut Vec<String>,
+) -> Result<(), ApiProtocolError> {
+    let Some(policy) = request.capabilities.effective_prompt_cache() else {
+        return Ok(());
+    };
+    if policy.is_disabled() {
+        return Ok(());
+    }
+
+    match wire_format {
+        WireFormat::OpenAiResponses | WireFormat::OpenAiChatCompletions => {
+            if !policy.breakpoint().is_auto() {
+                if policy.is_required() {
+                    return unsupported_prompt_cache(
+                        wire_format,
+                        "OpenAI prompt cache does not support explicit breakpoints",
+                    );
+                }
+                loss_reasons.push(format!(
+                    "prompt cache breakpoint is not emitted when bridging to {}",
+                    wire_format_name(wire_format)
+                ));
+            }
+        }
+        WireFormat::AnthropicMessages => {
+            if policy.key().is_some() {
+                if policy.is_required() {
+                    return unsupported_prompt_cache(
+                        wire_format,
+                        "Claude prompt cache does not support explicit cache keys",
+                    );
+                }
+                loss_reasons
+                    .push("prompt cache key is dropped when bridging to anthropic_messages".into());
+            }
+            if !claude_prompt_cache_placement_available(&policy, request) {
+                if policy.is_required() {
+                    return unsupported_prompt_cache(
+                        wire_format,
+                        "Claude prompt cache breakpoint cannot be represented for this request",
+                    );
+                }
+                clear_prompt_cache_policy(request);
+                loss_reasons.push(
+                    "prompt cache policy is dropped when bridging to anthropic_messages".into(),
+                );
+            }
+        }
+        WireFormat::GeminiGenerateContent => {
+            if policy.is_required() {
+                return unsupported_prompt_cache(
+                    wire_format,
+                    "prompt cache is not supported by gemini_generate_content",
+                );
+            }
+            clear_prompt_cache_policy(request);
+            loss_reasons.push(
+                "prompt cache policy is dropped when bridging to gemini_generate_content".into(),
+            );
+        }
+        _ => {
+            if policy.is_required() {
+                return unsupported_prompt_cache(
+                    wire_format,
+                    "prompt cache is only supported for generation wire formats",
+                );
+            }
+            clear_prompt_cache_policy(request);
+            loss_reasons.push(format!(
+                "prompt cache policy is dropped when bridging to {}",
+                wire_format_name(wire_format)
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn unsupported_prompt_cache<T>(
+    wire_format: WireFormat,
+    message: impl Into<String>,
+) -> Result<T, ApiProtocolError> {
+    Err(ApiProtocolError::UnsupportedFeature {
+        wire_format,
+        message: message.into(),
+    })
+}
+
+fn clear_prompt_cache_policy(request: &mut LlmRequest) {
+    request.capabilities.prompt_cache = None;
+    request.capabilities.cache = None;
+}
+
+fn claude_prompt_cache_placement_available(
+    policy: &PromptCachePolicy,
+    request: &LlmRequest,
+) -> bool {
+    match policy.breakpoint() {
+        CacheBreakpoint::Auto => {
+            !request.capabilities.tools.is_empty() || request.normalized_instructions().is_some()
+        }
+        CacheBreakpoint::EndOfTools => !request.capabilities.tools.is_empty(),
+        CacheBreakpoint::EndOfInstructions => request.normalized_instructions().is_some(),
+        CacheBreakpoint::EndOfMessage { index } => request
+            .normalized_messages()
+            .into_iter()
+            .filter(|message| !matches!(message.role, MessageRole::System | MessageRole::Developer))
+            .nth(index)
+            .is_some_and(|message| !message.parts.is_empty()),
+        CacheBreakpoint::EndOfContentBlock {
+            message_index,
+            part_index,
+        } => request
+            .normalized_messages()
+            .into_iter()
+            .filter(|message| !matches!(message.role, MessageRole::System | MessageRole::Developer))
+            .nth(message_index)
+            .is_some_and(|message| part_index < message.parts.len()),
+    }
 }
 
 fn request_has_unemitted_vendor_extensions(wire_format: WireFormat, request: &LlmRequest) -> bool {
@@ -1554,7 +1682,8 @@ fn dedupe_loss_reasons(mut reasons: Vec<String>) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::types::{
-        CapabilitySet, GenerationConfig, Message, MessageRole, RequestItem, ToolDefinition,
+        CacheBreakpoint, CapabilitySet, GenerationConfig, Message, MessageRole, PromptCacheKey,
+        PromptCachePolicy, PromptCacheRetention, RequestItem, ToolDefinition,
     };
 
     #[test]
@@ -1658,6 +1787,98 @@ mod tests {
         assert_eq!(value["enable_thinking"], false);
     }
 
+    fn prompt_cache_api_request(policy: PromptCachePolicy) -> ApiRequest {
+        ApiRequest::Responses(LlmRequest {
+            model: "gpt-5.4".into(),
+            instructions: Some("Stable instructions".into()),
+            input: vec![RequestItem::from(Message::text(MessageRole::User, "hi"))],
+            messages: Vec::new(),
+            capabilities: CapabilitySet {
+                prompt_cache: Some(policy),
+                ..Default::default()
+            },
+            generation: GenerationConfig::default(),
+            metadata: Default::default(),
+            vendor_extensions: VendorExtensions::new(),
+        })
+    }
+
+    #[test]
+    fn best_effort_prompt_cache_reports_loss_for_gemini() {
+        let request = prompt_cache_api_request(PromptCachePolicy::BestEffort {
+            key: Some(PromptCacheKey::Explicit {
+                value: "tenant-a".into(),
+            }),
+            retention: PromptCacheRetention::Long,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        });
+
+        let report = emit_api_request(WireFormat::GeminiGenerateContent, &request)
+            .expect("best-effort prompt cache should degrade for gemini");
+
+        assert!(report.bridged);
+        assert!(report.lossy);
+        assert!(report
+            .loss_reasons
+            .iter()
+            .any(|reason| reason.contains("prompt cache policy is dropped")));
+        let body: Value = serde_json::from_str(&report.value).expect("parse gemini body");
+        assert!(body.get("prompt_cache_key").is_none());
+    }
+
+    #[test]
+    fn required_prompt_cache_errors_for_gemini() {
+        let request = prompt_cache_api_request(PromptCachePolicy::Required {
+            key: None,
+            retention: PromptCacheRetention::ProviderDefault,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        });
+
+        let err = emit_api_request(WireFormat::GeminiGenerateContent, &request)
+            .expect_err("required prompt cache should fail for gemini");
+        assert!(matches!(err, ApiProtocolError::UnsupportedFeature { .. }));
+    }
+
+    #[test]
+    fn best_effort_openai_breakpoint_is_lossy_but_emits_supported_fields() {
+        let request = prompt_cache_api_request(PromptCachePolicy::BestEffort {
+            key: Some(PromptCacheKey::Explicit {
+                value: "tenant-a".into(),
+            }),
+            retention: PromptCacheRetention::Short,
+            breakpoint: CacheBreakpoint::EndOfInstructions,
+            vendor_extensions: VendorExtensions::new(),
+        });
+
+        let report = emit_api_request(WireFormat::OpenAiResponses, &request)
+            .expect("best-effort openai prompt cache should emit partial support");
+        assert!(report.lossy);
+        assert!(report
+            .loss_reasons
+            .iter()
+            .any(|reason| reason.contains("prompt cache breakpoint")));
+        let body: Value = serde_json::from_str(&report.value).expect("parse openai body");
+        assert_eq!(body["prompt_cache_key"], "tenant-a");
+        assert_eq!(body["prompt_cache_retention"], "in_memory");
+    }
+
+    #[test]
+    fn required_claude_prompt_cache_key_errors_before_transport() {
+        let request = prompt_cache_api_request(PromptCachePolicy::Required {
+            key: Some(PromptCacheKey::Explicit {
+                value: "tenant-a".into(),
+            }),
+            retention: PromptCacheRetention::ProviderDefault,
+            breakpoint: CacheBreakpoint::EndOfInstructions,
+            vendor_extensions: VendorExtensions::new(),
+        });
+
+        let err = emit_transport_request(WireFormat::AnthropicMessages, &request)
+            .expect_err("required claude cache key should fail");
+        assert!(matches!(err, ApiProtocolError::UnsupportedFeature { .. }));
+    }
     #[test]
     fn parse_transport_response_for_audio_speech_reads_binary_payload() {
         let response = TransportResponse {

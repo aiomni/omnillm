@@ -1,0 +1,75 @@
+id: system.omnillm.runtime
+kind: system
+version: 1
+status: current
+summary: OmniLLM Rust crate 的运行时边界
+
+sources:
+  manifests:
+    - Cargo.toml
+  modules:
+    - src/lib.rs
+
+crate:
+  name: omnillm
+  edition: "2021"
+  rust_version: "1.75"
+  library_role: provider_neutral_llm_gateway
+
+features:
+  default:
+    - rustls
+  tls:
+    rustls: reqwest/rustls-tls
+    native_tls: reqwest/native-tls
+
+runtime:
+  async_runtime: tokio
+  cancellation_token: tokio_util::sync::CancellationToken
+  http_client: reqwest::Client
+  streaming_trait: futures_util::Stream
+  json_value_type: serde_json::Value
+  error_derives: thiserror::Error
+
+visibility:
+  public_modules:
+    - api
+    - api_protocol
+    - budget
+    - config
+    - error
+    - key
+    - protocol
+    - provider_registry
+    - replay
+    - types
+  crate_private_modules:
+    - dispatcher
+    - limiter
+    - pricing
+  gateway_module_visibility: private_module_with_public_reexports
+
+constraints:
+  spec_root: omni-coding/specs/current
+  source_scope: src
+  default_specs_are_current_only: true
+
+invariants:
+  - current_specs_are_single_source
+  - runtime_is_async_http
+  - provider_payloads_are_json_value_or_transport_body
+  - public_surface_is_reexported_from_lib
+
+semantics:
+  current_specs_are_single_source: LLM 默认只读取 omni-coding/specs/current 下的 Spec Objects。
+  runtime_is_async_http: Gateway 和 Dispatcher 的外部 IO 通过 tokio 与 reqwest 执行。
+  provider_payloads_are_json_value_or_transport_body: Provider wire JSON 保存在 serde_json::Value，非 JSON 经 RequestBody 或 ResponseBody 表达。
+  public_surface_is_reexported_from_lib: crate 用户通过 src/lib.rs 暴露的 reexport 使用功能。
+
+relations:
+  depends_on: []
+  extends: []
+  constrains:
+    - contract.public_api.surface
+    - capability.gateway.execute
+

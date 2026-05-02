@@ -89,8 +89,9 @@ pub use replay::{
     sanitize_json_value, sanitize_transport_request, sanitize_transport_response, ReplayFixture,
 };
 pub use types::{
-    BuiltinTool, CacheSettings, CapabilitySet, FinishReason, GenerationConfig, LlmRequest,
-    LlmResponse, LlmStreamEvent, Message, MessagePart, MessageRole, OutputModality,
+    BuiltinTool, CacheBreakpoint, CacheSettings, CapabilitySet, FinishReason, GenerationConfig,
+    LlmRequest, LlmResponse, LlmStreamEvent, Message, MessagePart, MessageRole, OutputModality,
+    PromptCacheKey, PromptCachePolicy, PromptCacheRetention, PromptCacheUsage, PromptLayoutBuilder,
     ReasoningCapability, RequestItem, ResponseItem, SafetySettings, StructuredOutputConfig,
     TokenUsage, ToolCallPart, ToolDefinition, ToolResultPart, VendorExtensions,
 };

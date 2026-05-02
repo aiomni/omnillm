@@ -364,6 +364,51 @@ let capabilities = CapabilitySet {
 
 These are canonical abstractions. Support depends on the target protocol. If a target cannot represent part of the capability set, conversion reports mark that as bridged and possibly lossy.
 
+### Prompt Cache
+
+Prompt cache support lives at `LlmRequest.capabilities.prompt_cache` and keeps the older `CapabilitySet.cache` as a compatibility hint. Use `PromptCachePolicy::BestEffort` when cache support is an optimization, and `PromptCachePolicy::Required` when losing cache semantics should fail before transport.
+
+```rust
+use omnillm::{
+    CacheBreakpoint, CapabilitySet, PromptCacheKey, PromptCachePolicy,
+    PromptCacheRetention,
+};
+
+let capabilities = CapabilitySet {
+    prompt_cache: Some(PromptCachePolicy::BestEffort {
+        key: Some(PromptCacheKey::Explicit { value: "tenant-a".into() }),
+        retention: PromptCacheRetention::Long,
+        breakpoint: CacheBreakpoint::Auto,
+        vendor_extensions: Default::default(),
+    }),
+    ..Default::default()
+};
+```
+
+Provider mapping:
+
+- OpenAI Responses and Chat Completions emit `prompt_cache_key` plus `prompt_cache_retention` (`in_memory` for short retention, `24h` for long retention). Explicit breakpoints are not representable; BestEffort reports loss during typed bridging, while Required returns an error.
+- Claude Messages emits `cache_control` with `type: ephemeral`; `Short` maps to `ttl: 5m`, `Long` maps to `ttl: 1h`, and supported breakpoints can target tools, system instructions, messages, or content blocks.
+- Gemini GenerateContent has no typed prompt cache mapping; BestEffort is dropped with `ConversionReport.loss_reasons`, and Required fails before transport.
+
+Provider usage is preserved in `TokenUsage.prompt_cache`:
+
+- OpenAI cached prefixes appear as `cached_input_tokens`.
+- Claude cache hits and writes appear as `cache_read_input_tokens`, `cache_creation_input_tokens`, `cache_creation_short_input_tokens`, and `cache_creation_long_input_tokens` when the provider reports them.
+
+`PromptLayoutBuilder` helps keep a stable cacheable prefix before dynamic user/RAG suffixes and can generate deterministic tenant-scoped prefix keys:
+
+```rust
+use omnillm::{Message, MessageRole, PromptCacheRetention, PromptLayoutBuilder};
+
+let request = PromptLayoutBuilder::new("gpt-5.4")
+    .instructions("Answer from the stable policy document.")
+    .stable_message(Message::text(MessageRole::User, "Stable policy context"))
+    .user_input("What changed for my account?")
+    .stable_prefix_cache_key("support-bot", Some("tenant-a"), PromptCacheRetention::Long, false)
+    .build();
+```
+
 ## Non-Streaming Calls
 
 Use `Gateway::call` for one-shot generation:
@@ -455,6 +500,7 @@ Key points:
 - requests reserve estimated cost before dispatch
 - final cost is settled against actual usage
 - successful requests can settle up or down
+- prompt cache discounts or write costs are applied only after provider usage telemetry is available and the model has known cache rates
 - failed or truncated streams do not automatically refund everything; the gateway uses known or estimated partial usage when possible
 
 Observability methods:

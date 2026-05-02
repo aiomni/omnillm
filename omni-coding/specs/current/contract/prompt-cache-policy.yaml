@@ -1,0 +1,286 @@
+id: contract.prompt_cache.policy
+kind: contract
+version: 1
+status: current
+summary: Provider-neutral prompt cache policy and telemetry support
+
+sources:
+  current_modules:
+    - src/types.rs
+    - src/protocol.rs
+    - src/api_protocol.rs
+    - src/pricing.rs
+    - src/gateway.rs
+  external_protocols:
+    - provider: OpenAI
+      capability: prompt_caching
+      fields:
+        - prompt_cache_key
+        - prompt_cache_retention
+        - usage.input_tokens_details.cached_tokens
+        - usage.prompt_tokens_details.cached_tokens
+    - provider: Anthropic
+      capability: prompt_caching
+      fields:
+        - cache_control
+        - usage.cache_read_input_tokens
+        - usage.cache_creation_input_tokens
+
+implementation_state:
+  typed_prompt_cache_policy: implemented
+  current_canonical_policy:
+    type: PromptCachePolicy
+    path: LlmRequest.capabilities.prompt_cache
+    telemetry_path: TokenUsage.prompt_cache
+  current_canonical_hint:
+    type: CacheSettings
+    path: CapabilitySet.cache
+    role: legacy_compatibility_hint
+    migration:
+      enabled_false: PromptCachePolicy::Disabled
+      enabled_true: PromptCachePolicy::BestEffort
+      vendor_extensions: PromptCachePolicy.vendor_extensions
+  current_provider_wire_mapping:
+    OpenAI:
+      request_fields:
+        - prompt_cache_key
+        - prompt_cache_retention
+      unsupported_required:
+        - explicit_breakpoint
+    ClaudeMessages:
+      request_fields:
+        - cache_control
+      supported_breakpoints:
+        - Auto
+        - EndOfTools
+        - EndOfInstructions
+        - EndOfMessage
+        - EndOfContentBlock
+      unsupported_required:
+        - explicit_cache_key
+        - missing_breakpoint_target
+    GeminiGenerateContent: unsupported
+  current_usage_telemetry_mapping:
+    OpenAI:
+      cached_input_tokens:
+        - usage.input_tokens_details.cached_tokens
+        - usage.prompt_tokens_details.cached_tokens
+    ClaudeMessages:
+      cache_read_input_tokens: usage.cache_read_input_tokens
+      cache_creation_input_tokens: usage.cache_creation_input_tokens
+      cache_creation_short_input_tokens:
+        - usage.cache_creation.ephemeral_5m_input_tokens
+        - usage.cache_creation_5m_input_tokens
+      cache_creation_long_input_tokens:
+        - usage.cache_creation.ephemeral_1h_input_tokens
+        - usage.cache_creation_1h_input_tokens
+  current_openai_escape_hatch:
+    field: LlmRequest.vendor_extensions
+    allowed_top_level_fields:
+      - prompt_cache_key
+      - prompt_cache_retention
+    typed_api: true
+    precedence: typed_fields_win_over_vendor_extensions
+  current_claude_escape_hatch: typed_cache_control_mapping
+  validation:
+    - cargo fmt
+    - cargo test
+
+canonical_schema_target:
+  PromptCachePolicy:
+    variants:
+      Disabled: {}
+      BestEffort:
+        key: Option<PromptCacheKey>
+        retention: PromptCacheRetention
+        breakpoint: CacheBreakpoint
+        vendor_extensions: VendorExtensions
+      Required:
+        key: Option<PromptCacheKey>
+        retention: PromptCacheRetention
+        breakpoint: CacheBreakpoint
+        vendor_extensions: VendorExtensions
+  PromptCacheKey:
+    variants:
+      Explicit:
+        value: String
+      StablePrefixHash:
+        namespace: String
+        tenant_scope: Option<String>
+  PromptCacheRetention:
+    variants:
+      - ProviderDefault
+      - Short
+      - Long
+  CacheBreakpoint:
+    variants:
+      Auto: {}
+      EndOfTools: {}
+      EndOfInstructions: {}
+      EndOfMessage:
+        index: usize
+      EndOfContentBlock:
+        message_index: usize
+        part_index: usize
+  PromptCacheUsage:
+    fields:
+      cached_input_tokens: Option<u32>
+      cache_read_input_tokens: Option<u32>
+      cache_creation_input_tokens: Option<u32>
+      cache_creation_short_input_tokens: Option<u32>
+      cache_creation_long_input_tokens: Option<u32>
+      vendor_extensions: VendorExtensions
+
+canonical_model_target:
+  request_attachment:
+    preferred_path: LlmRequest.capabilities.prompt_cache
+    compatibility_path: LlmRequest.capabilities.cache
+  response_attachment:
+    preferred_path: TokenUsage.prompt_cache
+  cache_settings_migration:
+    CacheSettings.enabled_false: PromptCachePolicy::Disabled
+    CacheSettings.enabled_true: PromptCachePolicy::BestEffort
+    CacheSettings.vendor_extensions: PromptCachePolicy.vendor_extensions
+
+provider_mapping_target:
+  OpenAI:
+    activation: service_side_automatic_prefix_cache
+    minimum_effective_prefix_tokens: 1024
+    request_fields:
+      prompt_cache_key: PromptCachePolicy.key
+      prompt_cache_retention: PromptCachePolicy.retention
+    unsupported_fields:
+      - CacheBreakpoint
+    required_policy_behavior:
+      unsupported_breakpoint: ProtocolError::UnsupportedFeature
+    best_effort_behavior:
+      unsupported_breakpoint: ConversionReport.loss_reasons
+    telemetry:
+      cached_input_tokens:
+        - usage.input_tokens_details.cached_tokens
+        - usage.prompt_tokens_details.cached_tokens
+    pricing_dependency: provider_specific_cached_token_rate
+  ClaudeMessages:
+    activation: explicit_cache_control
+    request_fields:
+      cache_control:
+        type: ephemeral
+        ttl: PromptCacheRetention
+    placement_order:
+      - tools
+      - system
+      - messages
+    breakpoint_mapping:
+      Auto: top_level_or_latest_supported_prefix
+      EndOfTools: tools_cache_control
+      EndOfInstructions: system_cache_control
+      EndOfMessage: message_content_cache_control
+      EndOfContentBlock: content_block_cache_control
+    telemetry:
+      cache_read_input_tokens: usage.cache_read_input_tokens
+      cache_creation_input_tokens: usage.cache_creation_input_tokens
+    pricing_dependency: provider_specific_cache_write_and_read_rates
+  GeminiGenerateContent:
+    activation: unsupported
+    required_policy_behavior: ProtocolError::UnsupportedFeature
+    best_effort_behavior: ConversionReport.loss_reasons
+
+prefix_layout:
+  ordered_segments:
+    - tools
+    - instructions
+    - stable_examples
+    - stable_context
+    - conversation_history
+    - dynamic_user_input
+    - dynamic_rag_context
+  cacheable_prefix_segments:
+    - tools
+    - instructions
+    - stable_examples
+    - stable_context
+    - conversation_history
+  dynamic_suffix_segments:
+    - dynamic_user_input
+    - dynamic_rag_context
+  key_material:
+    includes:
+      - provider
+      - wire_protocol
+      - model_family
+      - stable_prefix_hash
+      - tenant_scope
+    excludes:
+      - raw_api_key
+      - dynamic_user_input
+      - dynamic_rag_context
+
+conversion_rules:
+  unsupported_best_effort:
+    result: emit_without_cache_fields
+    report: ConversionReport.lossy_true_with_loss_reason
+  unsupported_required:
+    result: error
+    error: ProtocolError::UnsupportedFeature
+  lossy_conditions:
+    - target_provider_has_no_prompt_cache_mapping
+    - target_provider_cannot_express_requested_breakpoint
+    - target_provider_cannot_express_requested_retention
+    - vendor_extensions_for_prompt_cache_are_not_emitted
+  no_hit_assumption: true
+
+pricing_rules:
+  cache_telemetry_source_of_truth: provider_usage
+  pre_request_estimate:
+    cache_hit_rate_assumption: none
+    default_behavior: no_cache_discount
+  post_response_actual:
+    requires_prompt_cache_usage: true
+    requires_provider_rate_table: true
+  unsupported_pricing_behavior:
+    use_existing_uncached_pricing: true
+    preserve_prompt_cache_usage_for_observability: true
+
+constraints:
+  typed_support_currently_implemented: true
+  prompt_cache_policy_is_provider_neutral: true
+  provider_native_fields_are_not_hidden_in_generic_bool: true
+  required_policy_must_not_silently_degrade: true
+  best_effort_policy_may_degrade_with_loss_report: true
+  cache_key_must_be_tenant_safe: true
+  cache_hit_must_be_observed_from_telemetry: true
+  pricing_discount_requires_provider_specific_rates: true
+
+invariants:
+  - disabled_policy_emits_no_prompt_cache_fields
+  - best_effort_unsupported_mapping_reports_loss
+  - required_unsupported_mapping_returns_error
+  - stable_prefix_precedes_dynamic_suffix
+  - cache_key_excludes_secret_key_material
+  - openai_typed_mapping_does_not_require_breakpoints
+  - claude_mapping_uses_cache_control
+  - prompt_cache_usage_is_preserved_when_reported
+  - budget_pricing_does_not_assume_cache_hits_before_response
+
+semantics:
+  disabled_policy_emits_no_prompt_cache_fields: Disabled disables typed prompt cache emission even when provider supports it.
+  best_effort_unsupported_mapping_reports_loss: BestEffort can emit a request without cache fields only when loss metadata records the degradation.
+  required_unsupported_mapping_returns_error: Required fails before transport if the requested prompt cache semantics cannot be represented.
+  stable_prefix_precedes_dynamic_suffix: Cacheable static content must be ordered before per-request dynamic content.
+  cache_key_excludes_secret_key_material: Generated cache keys must not include raw API keys or sensitive request data.
+  openai_typed_mapping_does_not_require_breakpoints: OpenAI mapping relies on provider automatic prefix matching and optional key or retention fields.
+  claude_mapping_uses_cache_control: Claude mapping must emit provider-native cache_control at the selected prefix boundary.
+  prompt_cache_usage_is_preserved_when_reported: Provider cache read/write/cached token telemetry must be represented in canonical usage.
+  budget_pricing_does_not_assume_cache_hits_before_response: Cost estimates must not apply cache discounts before provider usage confirms them.
+
+relations:
+  depends_on:
+    - contract.generation.model
+    - contract.generation.transcoding
+    - contract.endpoint.protocol
+    - contract.error.model
+    - contract.multi_endpoint.transcoding
+    - capability.budget.cost
+  extends: []
+  constrains:
+    - capability.gateway.execute

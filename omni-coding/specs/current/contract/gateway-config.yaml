@@ -1,0 +1,117 @@
+id: contract.gateway.config
+kind: contract
+version: 1
+status: current
+summary: Gateway 构建配置与默认值
+
+sources:
+  modules:
+    - src/config.rs
+    - src/gateway.rs
+
+types:
+  KeyConfig:
+    fields:
+      key: String
+      label: String
+      tpm_limit: u32
+      rpm_limit: u32
+    defaults:
+      tpm_limit: 90000
+      rpm_limit: 500
+    builders:
+      - new
+      - tpm_limit
+      - rpm_limit
+  PoolConfig:
+    fields:
+      max_cas_attempts: usize
+      circuit_breaker_threshold: u32
+      circuit_breaker_cooldown: Duration
+    defaults:
+      max_cas_attempts: 5
+      circuit_breaker_threshold: 5
+      circuit_breaker_cooldown_seconds: 30
+  GatewayConfig:
+    fields:
+      provider_endpoint: ProviderEndpoint
+      keys: Vec<KeyConfig>
+      budget_limit_usd: Option<f64>
+      pool_config: PoolConfig
+      request_timeout: Duration
+    accessors:
+      - provider_endpoint
+      - budget_limit_usd
+  GatewayBuilder:
+    fields:
+      provider_endpoint: ProviderEndpoint
+      keys: Vec<KeyConfig>
+      budget_limit_usd: Option<f64>
+      pool_config: PoolConfig
+      request_timeout: Duration
+    defaults:
+      keys: []
+      budget_limit_usd: null
+      pool_config: PoolConfig::default
+      request_timeout_seconds: 120
+
+operations:
+  GatewayBuilder::new:
+    input:
+      provider_endpoint: ProviderEndpoint
+    output: GatewayBuilder
+  GatewayBuilder::add_key:
+    input:
+      key: KeyConfig
+    output: GatewayBuilder
+  GatewayBuilder::add_keys:
+    input:
+      keys: IntoIterator<KeyConfig>
+    output: GatewayBuilder
+  GatewayBuilder::budget_limit_usd:
+    input:
+      limit: f64
+    output: GatewayBuilder
+  GatewayBuilder::pool_config:
+    input:
+      config: PoolConfig
+    output: GatewayBuilder
+  GatewayBuilder::request_timeout:
+    input:
+      timeout: Duration
+    output: GatewayBuilder
+  GatewayBuilder::build:
+    input: GatewayBuilder
+    output: Result<Gateway, GatewayError>
+  GatewayBuilder::from_config:
+    input:
+      config: GatewayConfig
+    output: Result<Gateway, GatewayError>
+
+constraints:
+  build_requires_keys: true
+  missing_keys_error: GatewayError::NoAvailableKey
+  unspecified_budget_limit_usd: f64::MAX
+  key_material_visibility: crate_private
+
+invariants:
+  - key_defaults_are_applied_at_construction
+  - pool_defaults_are_applied_when_unset
+  - build_fails_without_keys
+  - from_config_preserves_configured_timeout_pool_and_budget
+
+semantics:
+  key_defaults_are_applied_at_construction: KeyConfig::new 设置默认 TPM 与 RPM 上限。
+  pool_defaults_are_applied_when_unset: GatewayBuilder::new 使用 PoolConfig::default。
+  build_fails_without_keys: 空 key 列表不会构造可用 Gateway。
+  from_config_preserves_configured_timeout_pool_and_budget: GatewayConfig 转 Builder 时保留 endpoint、keys、pool_config、request_timeout、budget_limit_usd。
+
+relations:
+  depends_on:
+    - contract.endpoint.protocol
+    - contract.error.model
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - capability.key_pool.balance
+

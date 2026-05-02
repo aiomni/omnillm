@@ -1,0 +1,110 @@
+id: system.src.coverage
+kind: system
+version: 1
+status: current
+summary: src 目录功能到 current specs 的覆盖映射
+
+sources:
+  root: src
+
+coverage:
+  src/lib.rs:
+    - system.omnillm.runtime
+    - contract.public_api.surface
+  src/config.rs:
+    - contract.gateway.config
+  src/gateway.rs:
+    - contract.gateway.config
+    - capability.gateway.execute
+    - contract.error.model
+  src/dispatcher.rs:
+    - capability.gateway.execute
+    - contract.error.model
+  src/error.rs:
+    - contract.error.model
+  src/pricing.rs:
+    - capability.budget.cost
+  src/budget/mod.rs:
+    - capability.budget.cost
+  src/budget/tracker.rs:
+    - capability.budget.cost
+  src/key/mod.rs:
+    - capability.key_pool.balance
+  src/key/inner.rs:
+    - capability.key_pool.balance
+  src/key/lease.rs:
+    - capability.key_pool.balance
+  src/key/pool.rs:
+    - capability.key_pool.balance
+  src/key/registry.rs:
+    - capability.key_pool.balance
+  src/limiter/mod.rs:
+    - capability.key_pool.balance
+  src/limiter/window.rs:
+    - capability.key_pool.balance
+  src/types.rs:
+    - contract.generation.model
+  src/protocol.rs:
+    - contract.endpoint.protocol
+    - contract.generation.transcoding
+    - contract.error.model
+  src/api.rs:
+    - contract.multi_endpoint.model
+  src/api_protocol.rs:
+    - contract.multi_endpoint.transcoding
+    - contract.error.model
+  src/provider_registry.rs:
+    - contract.provider.registry
+  src/replay.rs:
+    - capability.replay.sanitize
+
+required_spec_ids:
+  - system.omnillm.runtime
+  - contract.public_api.surface
+  - contract.gateway.config
+  - capability.gateway.execute
+  - capability.key_pool.balance
+  - capability.budget.cost
+  - contract.generation.model
+  - contract.endpoint.protocol
+  - contract.generation.transcoding
+  - contract.multi_endpoint.model
+  - contract.multi_endpoint.transcoding
+  - contract.error.model
+  - contract.provider.registry
+  - capability.replay.sanitize
+
+constraints:
+  every_src_file_has_at_least_one_spec: true
+  generated_specs_are_current_snapshot: true
+  coverage_map_is_index_not_behavior_source: true
+
+invariants:
+  - src_file_coverage_complete
+  - coverage_spec_ids_exist_in_current
+  - behavior_specs_remain_authoritative_over_coverage_index
+
+semantics:
+  src_file_coverage_complete: coverage 中列出当前 src 下每个 Rust source file。
+  coverage_spec_ids_exist_in_current: coverage 引用的 spec_id 必须在 omni-coding/specs/current 中存在。
+  behavior_specs_remain_authoritative_over_coverage_index: 行为规则以被引用的 capability 或 contract Spec 为准。
+
+relations:
+  depends_on:
+    - system.omnillm.runtime
+    - contract.public_api.surface
+    - contract.gateway.config
+    - capability.gateway.execute
+    - capability.key_pool.balance
+    - capability.budget.cost
+    - contract.generation.model
+    - contract.endpoint.protocol
+    - contract.generation.transcoding
+    - contract.multi_endpoint.model
+    - contract.multi_endpoint.transcoding
+    - contract.error.model
+    - contract.provider.registry
+    - capability.replay.sanitize
+  extends: []
+  constrains: []
+

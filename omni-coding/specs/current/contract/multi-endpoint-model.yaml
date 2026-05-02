@@ -1,0 +1,250 @@
+id: contract.multi_endpoint.model
+kind: contract
+version: 1
+status: current
+summary: Generation 之外的多端点 canonical API model
+
+sources:
+  modules:
+    - src/api.rs
+
+endpoint_kind:
+  variants:
+    - Responses
+    - ChatCompletions
+    - Messages
+    - Embeddings
+    - ImageGenerations
+    - AudioTranscriptions
+    - AudioSpeech
+    - Rerank
+
+provider_kind:
+  variants:
+    - OpenAi
+    - AzureOpenAi
+    - Anthropic
+    - Gemini
+    - VertexAi
+    - Bedrock
+    - OpenAiCompatible
+
+wire_format:
+  variants:
+    - OpenAiResponses
+    - OpenAiChatCompletions
+    - AnthropicMessages
+    - GeminiGenerateContent
+    - OpenAiEmbeddings
+    - OpenAiImageGenerations
+    - OpenAiAudioTranscriptions
+    - OpenAiAudioSpeech
+    - OpenAiRerank
+  generation_formats:
+    - OpenAiResponses
+    - OpenAiChatCompletions
+    - AnthropicMessages
+    - GeminiGenerateContent
+  wire_endpoint_mapping:
+    OpenAiResponses: Responses
+    OpenAiChatCompletions: ChatCompletions
+    AnthropicMessages: Messages
+    GeminiGenerateContent: Messages
+    OpenAiEmbeddings: Embeddings
+    OpenAiImageGenerations: ImageGenerations
+    OpenAiAudioTranscriptions: AudioTranscriptions
+    OpenAiAudioSpeech: AudioSpeech
+    OpenAiRerank: Rerank
+  canonical_endpoint_mapping:
+    OpenAiResponses: Responses
+    OpenAiChatCompletions: Responses
+    AnthropicMessages: Responses
+    GeminiGenerateContent: Responses
+    OpenAiEmbeddings: Embeddings
+    OpenAiImageGenerations: ImageGenerations
+    OpenAiAudioTranscriptions: AudioTranscriptions
+    OpenAiAudioSpeech: AudioSpeech
+    OpenAiRerank: Rerank
+
+api_request:
+  variants:
+    Responses: LlmRequest
+    Embeddings: EmbeddingRequest
+    ImageGenerations: ImageGenerationRequest
+    AudioTranscriptions: AudioTranscriptionRequest
+    AudioSpeech: AudioSpeechRequest
+    Rerank: RerankRequest
+  try_into_llm_request_allowed_variant: Responses
+
+api_response:
+  variants:
+    Responses: LlmResponse
+    Embeddings: EmbeddingResponse
+    ImageGenerations: ImageGenerationResponse
+    AudioTranscriptions: AudioTranscriptionResponse
+    AudioSpeech: AudioSpeechResponse
+    Rerank: RerankResponse
+  try_into_llm_response_allowed_variant: Responses
+
+transport:
+  TransportRequest:
+    method: HttpMethod
+    path: String
+    headers: BTreeMap<String, String>
+    accept: Option<String>
+    body: RequestBody
+  TransportResponse:
+    status: u16
+    headers: BTreeMap<String, String>
+    content_type: Option<String>
+    body: ResponseBody
+  HttpMethod:
+    variants:
+      - Get
+      - Post
+      - Put
+      - Patch
+      - Delete
+  RequestBody:
+    variants:
+      - Json
+      - Multipart
+      - Text
+      - Binary
+  ResponseBody:
+    variants:
+      - Json
+      - Text
+      - Binary
+  MultipartValue:
+    variants:
+      - Text
+      - File
+
+conversion_report:
+  fields:
+    value: T
+    canonical_endpoint: EndpointKind
+    wire_format: WireFormat
+    bridged: bool
+    lossy: bool
+    loss_reasons: Vec<String>
+  native:
+    bridged: false
+    lossy: false
+    loss_reasons: []
+  bridged:
+    bridged: true
+    lossy: loss_reasons_non_empty
+
+endpoint_schemas:
+  embeddings:
+    request:
+      model: String
+      input: Vec<EmbeddingInput>
+      dimensions: Option<u32>
+      encoding_format: Option<String>
+      user: Option<String>
+      vendor_extensions: VendorExtensions
+    input_variants:
+      - Text
+      - Tokens
+    response:
+      model: String
+      data: Vec<EmbeddingVector>
+      usage: Option<EmbeddingUsage>
+      vendor_extensions: VendorExtensions
+  image_generations:
+    request:
+      model: Option<String>
+      prompt: String
+      size: Option<String>
+      quality: Option<String>
+      style: Option<String>
+      background: Option<String>
+      output_format: Option<String>
+      n: Option<u32>
+      vendor_extensions: VendorExtensions
+    response:
+      created: Option<u64>
+      data: Vec<GeneratedImage>
+      vendor_extensions: VendorExtensions
+  audio_transcriptions:
+    request:
+      model: String
+      audio: AudioInput
+      prompt: Option<String>
+      response_format: Option<String>
+      language: Option<String>
+      temperature: Option<f32>
+      timestamp_granularities: Vec<String>
+      vendor_extensions: VendorExtensions
+    audio_input_variants:
+      - Url
+      - File
+    response:
+      text: String
+      language: Option<String>
+      duration_seconds: Option<f32>
+      segments: Vec<AudioSegment>
+      words: Vec<TranscribedWord>
+      vendor_extensions: VendorExtensions
+  audio_speech:
+    request:
+      model: String
+      input: String
+      voice: String
+      response_format: Option<String>
+      speed: Option<f32>
+      vendor_extensions: VendorExtensions
+    response:
+      data_base64: String
+      media_type: Option<String>
+      vendor_extensions: VendorExtensions
+  rerank:
+    request:
+      model: String
+      query: String
+      documents: Vec<RerankDocument>
+      top_n: Option<u32>
+      return_documents: Option<bool>
+      vendor_extensions: VendorExtensions
+    document_variants:
+      - Text
+      - Json
+    response:
+      model: String
+      results: Vec<RerankResult>
+      usage: Option<RerankUsage>
+      vendor_extensions: VendorExtensions
+
+constraints:
+  generation_canonical_endpoint_is_responses: true
+  non_generation_wire_formats_do_not_convert_to_provider_protocol: true
+  transport_json_post_constructor_uses_post_method: true
+
+invariants:
+  - wire_format_has_single_wire_endpoint_kind
+  - wire_format_has_single_canonical_endpoint_kind
+  - api_request_endpoint_kind_matches_variant
+  - api_response_endpoint_kind_matches_variant
+  - conversion_report_lossy_matches_loss_reasons
+  - transport_body_preserves_binary_as_base64
+
+semantics:
+  wire_format_has_single_wire_endpoint_kind: WireFormat::wire_endpoint_kind 返回上游 endpoint family。
+  wire_format_has_single_canonical_endpoint_kind: WireFormat::canonical_endpoint_kind 返回 parsed/emitted canonical family。
+  api_request_endpoint_kind_matches_variant: ApiRequest::canonical_endpoint_kind 由 enum variant 决定。
+  api_response_endpoint_kind_matches_variant: ApiResponse::canonical_endpoint_kind 由 enum variant 决定。
+  conversion_report_lossy_matches_loss_reasons: ConversionReport::bridged 的 lossy 等于 loss_reasons 非空。
+  transport_body_preserves_binary_as_base64: Binary 与 File body 使用 data_base64 表达二进制内容。
+
+relations:
+  depends_on:
+    - contract.generation.model
+    - contract.endpoint.protocol
+  extends: []
+  constrains:
+    - contract.multi_endpoint.transcoding
+    - contract.provider.registry
+

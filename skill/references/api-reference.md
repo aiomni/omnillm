@@ -122,7 +122,10 @@ Cross-provider capability fields include:
 - `builtin_tools`
 - `modalities`
 - `safety`
-- `cache`
+- `cache` legacy prompt-cache hint
+- `prompt_cache` typed prompt cache policy
+
+Prompt cache uses `PromptCachePolicy::{BestEffort, Required}` with `PromptCacheKey`, `PromptCacheRetention`, and `CacheBreakpoint`. OpenAI emits `prompt_cache_key` / `prompt_cache_retention`; Claude emits `cache_control`; Gemini drops BestEffort with a loss reason and rejects Required before transport.
 
 If a target provider cannot represent a capability, conversion may be bridged or
 lossy. Surface that explicitly.
@@ -133,6 +136,7 @@ Common response fields and helpers:
 
 - `response.model`
 - `response.usage.total()`
+- `response.usage.prompt_cache` for cached/read/write token telemetry
 - `response.content_text`
 
 Streaming yields `Result<LlmStreamEvent, GatewayError>`. Common events include:

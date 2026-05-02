@@ -1,0 +1,129 @@
+id: capability.gateway.execute
+kind: capability
+version: 1
+status: current
+summary: Gateway 执行非流式与流式 LLM 请求
+
+sources:
+  modules:
+    - src/gateway.rs
+    - src/dispatcher.rs
+
+input:
+  call:
+    request: LlmRequest
+    cancel: CancellationToken
+  stream:
+    request: LlmRequest
+    cancel: CancellationToken
+
+output:
+  call: Result<LlmResponse, GatewayError>
+  stream: Result<GatewayStream, GatewayError>
+
+pipeline:
+  preflight_order:
+    - estimate_tokens
+    - estimate_cost
+    - acquire_key_lease
+    - reserve_budget
+    - acquire_local_rpm_slot
+    - dispatch_http
+  call_settlement:
+    success:
+      cost: pricing::actual(response.usage, request.model)
+      key_state: report_success
+    cancelled:
+      cost: full_refund
+      key_state: unchanged
+    rate_limited_or_unauthorized_or_provider_error:
+      cost: full_refund
+      key_state: report_error
+    protocol_error:
+      cost: full_refund
+      key_state: unchanged
+  stream_settlement:
+    upstream_open_error:
+      cost: full_refund
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    completed_event:
+      cost: pricing::actual(completed.response.usage, request.model)
+      key_state: report_success
+    stream_error_with_usage:
+      cost: pricing::actual(event_usage, request.model)
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    stream_error_without_usage:
+      usage: estimated_prompt_tokens_plus_generated_chars_div_4
+      cost: pricing::actual(partial_usage, request.model)
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    eof_without_completed:
+      output: synthesized_completed_event
+      cost: usage_or_estimated_partial_usage
+      key_state: report_success
+
+dispatcher:
+  call_transport:
+    method: POST
+    content_type: application/json
+    body: emit_request_with_mode(stream=false)
+    success_parser: parse_response
+  stream_transport:
+    method: POST
+    content_type: application/json
+    accept: text/event-stream
+    body: emit_request_with_mode(stream=true)
+    frame_parser: take_sse_frames_then_parse_stream_events
+  auth_application:
+    Bearer: bearer_auth
+    Header: header_name_with_key_value
+    Query: query_name_with_key_value
+  error_classification:
+    http_401_403: ApiError::Unauthorized
+    http_429: ApiError::RateLimited
+    other_http: ApiError::Provider
+    network: ApiError::Provider
+    protocol: ApiError::Protocol
+    cancelled: ApiError::Cancelled
+  retry_after_default_seconds: 60
+
+observability:
+  Gateway::pool_status: Vec<KeyStatus>
+  Gateway::budget_remaining_usd: f64
+  Gateway::budget_used_usd: f64
+
+constraints:
+  requires_key_before_budget_reservation: true
+  requires_budget_before_rpm_slot: true
+  stream_type: Pin<Box<dyn Stream<Item = Result<LlmStreamEvent, GatewayError>> + Send>>
+  request_timeout_source: GatewayBuilder::request_timeout
+
+invariants:
+  - lease_drop_releases_tpm_reservation
+  - budget_reservation_is_settled_once_per_execution_path
+  - local_rpm_rejection_refunds_budget
+  - cancellation_refunds_budget
+  - provider_auth_is_injected_per_request
+  - non_success_http_is_classified_before_body_parsing_as_success
+  - incomplete_stream_yields_canonical_completed_event
+
+semantics:
+  lease_drop_releases_tpm_reservation: KeyLease RAII Drop 负责归还 TPM in-flight 预留。
+  budget_reservation_is_settled_once_per_execution_path: 每个已 reserve 的请求在成功、错误、取消或流结束路径上调用 settle。
+  local_rpm_rejection_refunds_budget: RPM window 拒绝不会消耗预算。
+  cancellation_refunds_budget: CancellationToken 触发时非流式全额退款，流式按已观察 usage 或 partial usage 结算。
+  provider_auth_is_injected_per_request: Dispatcher 不持有 key，发送请求时从 KeyLease 注入认证。
+  non_success_http_is_classified_before_body_parsing_as_success: HTTP 非 2xx 进入 classify_error。
+  incomplete_stream_yields_canonical_completed_event: 上游未发送 Completed 时 Gateway 根据累积文本合成 Completed。
+
+relations:
+  depends_on:
+    - contract.gateway.config
+    - contract.generation.model
+    - contract.generation.transcoding
+    - contract.endpoint.protocol
+    - capability.key_pool.balance
+    - capability.budget.cost
+    - contract.error.model
+  extends: []
+  constrains: []
+

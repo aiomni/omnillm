@@ -9,10 +9,11 @@ use thiserror::Error;
 
 use crate::error::ProviderError;
 use crate::types::{
-    BuiltinTool, CapabilitySet, FinishReason, GenerationConfig, LlmRequest, LlmResponse,
-    LlmStreamEvent, Message, MessagePart, MessageRole, OutputModality, ReasoningCapability,
-    RequestItem, ResponseItem, StructuredOutputConfig, TokenUsage, ToolCallPart, ToolDefinition,
-    ToolResultPart, VendorExtensions,
+    BuiltinTool, CacheBreakpoint, CapabilitySet, FinishReason, GenerationConfig, LlmRequest,
+    LlmResponse, LlmStreamEvent, Message, MessagePart, MessageRole, OutputModality, PromptCacheKey,
+    PromptCachePolicy, PromptCacheRetention, PromptCacheUsage, ReasoningCapability, RequestItem,
+    ResponseItem, StructuredOutputConfig, TokenUsage, ToolCallPart, ToolDefinition, ToolResultPart,
+    VendorExtensions,
 };
 
 /// Low-level upstream generation wire protocols used by the codec/transcoder
@@ -601,6 +602,8 @@ fn parse_openai_responses_request(body: &Value) -> Result<LlmRequest, ProtocolEr
                 "frequency_penalty",
                 "seed",
                 "metadata",
+                "prompt_cache_key",
+                "prompt_cache_retention",
                 "stream",
             ],
         ),
@@ -648,6 +651,7 @@ fn emit_openai_responses_request(
 
     emit_generation_common(&mut map, &request.generation, true);
     emit_openai_responses_capabilities(&mut map, &request.capabilities)?;
+    emit_openai_prompt_cache_policy(&mut map, request)?;
 
     if !request.metadata.is_empty() {
         map.insert(
@@ -680,6 +684,7 @@ fn parse_openai_chat_request(body: &Value) -> Result<LlmRequest, ProtocolError> 
         modalities: vec![OutputModality::Text],
         safety: None,
         cache: None,
+        prompt_cache: parse_openai_prompt_cache_policy(body),
         builtin_tools: Vec::new(),
         vendor_extensions: VendorExtensions::new(),
     };
@@ -716,6 +721,8 @@ fn parse_openai_chat_request(body: &Value) -> Result<LlmRequest, ProtocolError> 
                 "presence_penalty",
                 "frequency_penalty",
                 "seed",
+                "prompt_cache_key",
+                "prompt_cache_retention",
                 "stream",
             ],
         ),
@@ -766,6 +773,7 @@ fn emit_openai_chat_request(request: &LlmRequest, stream: bool) -> Result<Value,
     }
 
     emit_generation_common(&mut map, &request.generation, false);
+    emit_openai_prompt_cache_policy(&mut map, request)?;
     extend_with_vendor_extensions(&mut map, &request.vendor_extensions);
 
     if stream {
@@ -811,6 +819,7 @@ fn parse_claude_request(body: &Value) -> Result<LlmRequest, ProtocolError> {
         modalities: vec![OutputModality::Text],
         safety: None,
         cache: None,
+        prompt_cache: parse_claude_prompt_cache_policy(body),
         builtin_tools: Vec::new(),
         vendor_extensions: VendorExtensions::new(),
     };
@@ -861,17 +870,25 @@ fn emit_claude_request(request: &LlmRequest, stream: bool) -> Result<Value, Prot
         Value::from(request.generation.max_output_tokens.unwrap_or(1024)),
     );
 
-    if let Some(system) = request.normalized_instructions() {
-        map.insert("system".into(), Value::String(system));
-    }
-
-    let messages = request_messages_for_separate_instruction_protocol(request)
+    let prompt_cache = request.capabilities.effective_prompt_cache();
+    let mut system = request.normalized_instructions().map(Value::String);
+    let mut messages = request_messages_for_separate_instruction_protocol(request)
         .into_iter()
         .map(claude_message_json)
         .collect::<Result<Vec<_>, _>>()?;
-    map.insert("messages".into(), Value::Array(messages));
+    let mut tools = emit_claude_tools(&request.capabilities.tools);
 
-    let tools = emit_claude_tools(&request.capabilities.tools);
+    apply_claude_prompt_cache_policy(
+        &mut tools,
+        system.as_mut(),
+        &mut messages,
+        prompt_cache.as_ref(),
+    )?;
+
+    if let Some(system) = system {
+        map.insert("system".into(), system);
+    }
+    map.insert("messages".into(), Value::Array(messages));
     if !tools.is_empty() {
         map.insert("tools".into(), Value::Array(tools));
     }
@@ -1082,6 +1099,7 @@ fn parse_openai_responses_response(body: &Value) -> Result<LlmResponse, Protocol
             .and_then(|value| value.get("total_tokens"))
             .and_then(Value::as_u64)
             .map(|value| value as u32),
+        prompt_cache: parse_openai_prompt_cache_usage(body.get("usage")),
     };
 
     Ok(LlmResponse {
@@ -1112,11 +1130,7 @@ fn emit_openai_responses_response(response: &LlmResponse) -> Result<Value, Proto
         "status": response.finish_reason.as_ref().map(finish_reason_string),
         "output_text": response.content_text,
         "output": output,
-        "usage": {
-            "input_tokens": response.usage.prompt_tokens,
-            "output_tokens": response.usage.completion_tokens,
-            "total_tokens": response.usage.total(),
-        }
+        "usage": openai_responses_usage_json(&response.usage)
     }))
 }
 
@@ -1153,6 +1167,7 @@ fn parse_openai_chat_response(body: &Value) -> Result<LlmResponse, ProtocolError
                 .and_then(|value| value.get("total_tokens"))
                 .and_then(Value::as_u64)
                 .map(|value| value as u32),
+            prompt_cache: parse_openai_prompt_cache_usage(body.get("usage")),
         },
         model: body
             .get("model")
@@ -1177,11 +1192,7 @@ fn emit_openai_chat_response(response: &LlmResponse) -> Result<Value, ProtocolEr
             "finish_reason": response.finish_reason.as_ref().map(finish_reason_string),
             "message": openai_chat_message_json(message)?,
         }],
-        "usage": {
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens,
-            "total_tokens": response.usage.total(),
-        }
+        "usage": openai_chat_usage_json(&response.usage)
     }))
 }
 
@@ -1204,6 +1215,7 @@ fn parse_claude_response(body: &Value) -> Result<LlmResponse, ProtocolError> {
                 .and_then(Value::as_u64)
                 .unwrap_or(0) as u32,
             total_tokens: None,
+            prompt_cache: parse_claude_prompt_cache_usage(body.get("usage")),
         },
         model: body
             .get("model")
@@ -1227,10 +1239,7 @@ fn emit_claude_response(response: &LlmResponse) -> Result<Value, ProtocolError> 
         "model": response.model,
         "stop_reason": response.finish_reason.as_ref().map(finish_reason_string),
         "content": claude_content_parts(&message.parts)?,
-        "usage": {
-            "input_tokens": response.usage.prompt_tokens,
-            "output_tokens": response.usage.completion_tokens,
-        }
+        "usage": claude_usage_json(&response.usage)
     }))
 }
 
@@ -1262,6 +1271,7 @@ fn parse_gemini_response(body: &Value) -> Result<LlmResponse, ProtocolError> {
                 .and_then(|value| value.get("totalTokenCount"))
                 .and_then(Value::as_u64)
                 .map(|value| value as u32),
+            prompt_cache: None,
         },
         model: body
             .get("modelVersion")
@@ -1522,6 +1532,7 @@ fn parse_openai_chat_stream_events(body: &Value) -> Result<Vec<LlmStreamEvent>, 
                     .get("total_tokens")
                     .and_then(Value::as_u64)
                     .map(|value| value as u32),
+                prompt_cache: parse_openai_prompt_cache_usage(Some(usage)),
             },
         });
     }
@@ -1560,11 +1571,7 @@ fn emit_openai_chat_stream_event(
             }]
         }),
         LlmStreamEvent::Usage { usage } => json!({
-            "usage": {
-                "prompt_tokens": usage.prompt_tokens,
-                "completion_tokens": usage.completion_tokens,
-                "total_tokens": usage.total()
-            }
+            "usage": openai_chat_usage_json(usage)
         }),
         LlmStreamEvent::Completed { .. } => {
             return Ok(Some(ProviderStreamFrame {
@@ -1624,6 +1631,7 @@ fn parse_claude_stream_event(
                     .and_then(Value::as_u64)
                     .unwrap_or(0) as u32,
                 total_tokens: None,
+                prompt_cache: parse_claude_prompt_cache_usage(Some(usage)),
             });
             Ok(usage.map(|usage| LlmStreamEvent::Usage { usage }))
         }
@@ -1661,10 +1669,7 @@ fn emit_claude_stream_event(
         LlmStreamEvent::Usage { usage } => ProviderStreamFrame {
             event: Some("message_delta".into()),
             data: serde_json::to_string(&json!({
-                "usage": {
-                    "input_tokens": usage.prompt_tokens,
-                    "output_tokens": usage.completion_tokens
-                }
+                "usage": claude_usage_json(usage)
             }))?,
         },
         LlmStreamEvent::Completed { .. } => ProviderStreamFrame {
@@ -1710,6 +1715,7 @@ fn parse_gemini_stream_event(body: &Value) -> Result<Option<LlmStreamEvent>, Pro
                     .get("totalTokenCount")
                     .and_then(Value::as_u64)
                     .map(|value| value as u32),
+                prompt_cache: None,
             },
         }));
     }
@@ -1822,6 +1828,7 @@ fn parse_gemini_error(status: Option<u16>, body: &Value) -> ProviderError {
 
 fn parse_openai_responses_capabilities(body: &Value) -> Result<CapabilitySet, ProtocolError> {
     let mut capabilities = CapabilitySet::default();
+    capabilities.prompt_cache = parse_openai_prompt_cache_policy(body);
     if let Some(tools) = body.get("tools").and_then(Value::as_array) {
         for tool in tools {
             let tool_type = tool
@@ -2580,6 +2587,122 @@ fn emit_claude_tools(tools: &[ToolDefinition]) -> Vec<Value> {
         .collect()
 }
 
+fn apply_claude_prompt_cache_policy(
+    tools: &mut [Value],
+    system: Option<&mut Value>,
+    messages: &mut [Value],
+    policy: Option<&PromptCachePolicy>,
+) -> Result<(), ProtocolError> {
+    let Some(policy) = policy.filter(|policy| !policy.is_disabled()) else {
+        return Ok(());
+    };
+
+    if policy.key().is_some() && policy.is_required() {
+        return Err(ProtocolError::UnsupportedFeature(
+            "Claude prompt cache does not support explicit cache keys".into(),
+        ));
+    }
+
+    let cache_control = claude_cache_control_json(policy);
+    let applied = match policy.breakpoint() {
+        CacheBreakpoint::Auto => {
+            if !tools.is_empty() {
+                apply_cache_control_to_value(
+                    tools.last_mut().expect("checked non-empty"),
+                    cache_control,
+                )
+            } else if let Some(system) = system {
+                apply_cache_control_to_system(system, cache_control)
+            } else {
+                false
+            }
+        }
+        CacheBreakpoint::EndOfTools => tools
+            .last_mut()
+            .map(|tool| apply_cache_control_to_value(tool, cache_control))
+            .unwrap_or(false),
+        CacheBreakpoint::EndOfInstructions => system
+            .map(|system| apply_cache_control_to_system(system, cache_control))
+            .unwrap_or(false),
+        CacheBreakpoint::EndOfMessage { index } => messages
+            .get_mut(index)
+            .map(|message| apply_cache_control_to_message(message, None, cache_control))
+            .unwrap_or(false),
+        CacheBreakpoint::EndOfContentBlock {
+            message_index,
+            part_index,
+        } => messages
+            .get_mut(message_index)
+            .map(|message| apply_cache_control_to_message(message, Some(part_index), cache_control))
+            .unwrap_or(false),
+    };
+
+    if !applied && policy.is_required() {
+        return Err(ProtocolError::UnsupportedFeature(
+            "Claude prompt cache breakpoint cannot be represented for this request".into(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn claude_cache_control_json(policy: &PromptCachePolicy) -> Value {
+    let mut map = Map::new();
+    map.insert("type".into(), Value::String("ephemeral".into()));
+    match policy.retention() {
+        PromptCacheRetention::ProviderDefault => {}
+        PromptCacheRetention::Short => {
+            map.insert("ttl".into(), Value::String("5m".into()));
+        }
+        PromptCacheRetention::Long => {
+            map.insert("ttl".into(), Value::String("1h".into()));
+        }
+    }
+    extend_with_vendor_extensions(&mut map, prompt_cache_vendor_extensions(policy));
+    Value::Object(map)
+}
+
+fn apply_cache_control_to_value(value: &mut Value, cache_control: Value) -> bool {
+    let Some(object) = value.as_object_mut() else {
+        return false;
+    };
+    object.insert("cache_control".into(), cache_control);
+    true
+}
+
+fn apply_cache_control_to_system(system: &mut Value, cache_control: Value) -> bool {
+    match system {
+        Value::String(text) => {
+            let text = text.clone();
+            *system = json!([{ "type": "text", "text": text, "cache_control": cache_control }]);
+            true
+        }
+        Value::Array(blocks) => blocks
+            .last_mut()
+            .map(|block| apply_cache_control_to_value(block, cache_control))
+            .unwrap_or(false),
+        _ => false,
+    }
+}
+
+fn apply_cache_control_to_message(
+    message: &mut Value,
+    part_index: Option<usize>,
+    cache_control: Value,
+) -> bool {
+    let Some(parts) = message.get_mut("content").and_then(Value::as_array_mut) else {
+        return false;
+    };
+    let target_index = part_index.unwrap_or_else(|| parts.len().saturating_sub(1));
+    if parts.is_empty() {
+        return false;
+    }
+    parts
+        .get_mut(target_index)
+        .map(|part| apply_cache_control_to_value(part, cache_control))
+        .unwrap_or(false)
+}
+
 fn parse_claude_message(value: &Value) -> Result<Message, ProtocolError> {
     let role = value
         .get("role")
@@ -3076,6 +3199,305 @@ fn emit_generation_common(
     if let Some(seed) = generation.seed {
         map.insert("seed".into(), Value::from(seed));
     }
+}
+
+fn emit_openai_prompt_cache_policy(
+    map: &mut Map<String, Value>,
+    request: &LlmRequest,
+) -> Result<(), ProtocolError> {
+    let Some(policy) = request.capabilities.effective_prompt_cache() else {
+        return Ok(());
+    };
+    if policy.is_disabled() {
+        return Ok(());
+    }
+
+    if !policy.breakpoint().is_auto() && policy.is_required() {
+        return Err(ProtocolError::UnsupportedFeature(
+            "OpenAI prompt cache does not support explicit breakpoints".into(),
+        ));
+    }
+
+    if let Some(key) = policy.key() {
+        map.insert(
+            "prompt_cache_key".into(),
+            Value::String(prompt_cache_key_value(key, request)),
+        );
+    }
+
+    match policy.retention() {
+        PromptCacheRetention::ProviderDefault => {}
+        PromptCacheRetention::Short => {
+            map.insert(
+                "prompt_cache_retention".into(),
+                Value::String("in_memory".into()),
+            );
+        }
+        PromptCacheRetention::Long => {
+            map.insert("prompt_cache_retention".into(), Value::String("24h".into()));
+        }
+    }
+
+    extend_with_vendor_extensions(map, prompt_cache_vendor_extensions(&policy));
+    Ok(())
+}
+
+fn parse_openai_prompt_cache_policy(body: &Value) -> Option<PromptCachePolicy> {
+    let key = body
+        .get("prompt_cache_key")
+        .and_then(Value::as_str)
+        .map(|value| PromptCacheKey::Explicit {
+            value: value.to_string(),
+        });
+    let retention = body
+        .get("prompt_cache_retention")
+        .and_then(Value::as_str)
+        .map(parse_openai_prompt_cache_retention)
+        .unwrap_or_default();
+
+    if key.is_none() && retention == PromptCacheRetention::ProviderDefault {
+        None
+    } else {
+        Some(PromptCachePolicy::BestEffort {
+            key,
+            retention,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        })
+    }
+}
+
+fn parse_openai_prompt_cache_retention(value: &str) -> PromptCacheRetention {
+    match value {
+        "24h" => PromptCacheRetention::Long,
+        "in_memory" => PromptCacheRetention::Short,
+        _ => PromptCacheRetention::ProviderDefault,
+    }
+}
+
+fn parse_claude_prompt_cache_policy(body: &Value) -> Option<PromptCachePolicy> {
+    if value_contains_cache_control(body) {
+        Some(PromptCachePolicy::BestEffort {
+            key: None,
+            retention: parse_claude_prompt_cache_retention(body),
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        })
+    } else {
+        None
+    }
+}
+
+fn parse_claude_prompt_cache_retention(value: &Value) -> PromptCacheRetention {
+    find_cache_control_ttl(value)
+        .map(|ttl| match ttl {
+            "1h" => PromptCacheRetention::Long,
+            "5m" => PromptCacheRetention::Short,
+            _ => PromptCacheRetention::ProviderDefault,
+        })
+        .unwrap_or_default()
+}
+
+fn value_contains_cache_control(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => object
+            .iter()
+            .any(|(key, value)| key == "cache_control" || value_contains_cache_control(value)),
+        Value::Array(values) => values.iter().any(value_contains_cache_control),
+        _ => false,
+    }
+}
+
+fn find_cache_control_ttl(value: &Value) -> Option<&str> {
+    match value {
+        Value::Object(object) => {
+            if let Some(ttl) = object
+                .get("cache_control")
+                .and_then(|cache_control| cache_control.get("ttl"))
+                .and_then(Value::as_str)
+            {
+                return Some(ttl);
+            }
+            object.values().find_map(find_cache_control_ttl)
+        }
+        Value::Array(values) => values.iter().find_map(find_cache_control_ttl),
+        _ => None,
+    }
+}
+
+fn prompt_cache_key_value(key: &PromptCacheKey, request: &LlmRequest) -> String {
+    match key {
+        PromptCacheKey::Explicit { value } => value.clone(),
+        PromptCacheKey::StablePrefixHash {
+            namespace,
+            tenant_scope,
+        } => {
+            let fingerprint = json!({
+                "model": &request.model,
+                "instructions": request.normalized_instructions(),
+                "tools": &request.capabilities.tools,
+                "input": request.normalized_input(),
+            });
+            let hash = fnv1a64(fingerprint.to_string().as_bytes());
+            match tenant_scope {
+                Some(scope) => format!("{}:{}:{hash:016x}", namespace, scope),
+                None => format!("{}:{hash:016x}", namespace),
+            }
+        }
+    }
+}
+
+fn prompt_cache_vendor_extensions(policy: &PromptCachePolicy) -> &VendorExtensions {
+    match policy {
+        PromptCachePolicy::Disabled => empty_vendor_extensions(),
+        PromptCachePolicy::BestEffort {
+            vendor_extensions, ..
+        }
+        | PromptCachePolicy::Required {
+            vendor_extensions, ..
+        } => vendor_extensions,
+    }
+}
+
+fn empty_vendor_extensions() -> &'static VendorExtensions {
+    static EMPTY: std::sync::OnceLock<VendorExtensions> = std::sync::OnceLock::new();
+    EMPTY.get_or_init(VendorExtensions::new)
+}
+
+fn parse_openai_prompt_cache_usage(usage: Option<&Value>) -> Option<PromptCacheUsage> {
+    let usage = usage?;
+    let cached_input_tokens = nested_u32(usage, &["input_tokens_details", "cached_tokens"])
+        .or_else(|| nested_u32(usage, &["prompt_tokens_details", "cached_tokens"]));
+
+    let prompt_cache = PromptCacheUsage {
+        cached_input_tokens,
+        ..Default::default()
+    };
+    (!prompt_cache.is_empty()).then_some(prompt_cache)
+}
+
+fn parse_claude_prompt_cache_usage(usage: Option<&Value>) -> Option<PromptCacheUsage> {
+    let usage = usage?;
+    let cache_creation_short_input_tokens =
+        nested_u32(usage, &["cache_creation", "ephemeral_5m_input_tokens"])
+            .or_else(|| {
+                usage
+                    .get("cache_creation_5m_input_tokens")
+                    .and_then(value_as_u32)
+            })
+            .or_else(|| {
+                usage
+                    .get("cache_creation_short_input_tokens")
+                    .and_then(value_as_u32)
+            });
+    let cache_creation_long_input_tokens =
+        nested_u32(usage, &["cache_creation", "ephemeral_1h_input_tokens"])
+            .or_else(|| {
+                usage
+                    .get("cache_creation_1h_input_tokens")
+                    .and_then(value_as_u32)
+            })
+            .or_else(|| {
+                usage
+                    .get("cache_creation_long_input_tokens")
+                    .and_then(value_as_u32)
+            });
+    let cache_creation_input_tokens = usage
+        .get("cache_creation_input_tokens")
+        .and_then(value_as_u32);
+
+    let prompt_cache = PromptCacheUsage {
+        cached_input_tokens: None,
+        cache_read_input_tokens: usage.get("cache_read_input_tokens").and_then(value_as_u32),
+        cache_creation_input_tokens,
+        cache_creation_short_input_tokens,
+        cache_creation_long_input_tokens,
+        vendor_extensions: VendorExtensions::new(),
+    };
+    (!prompt_cache.is_empty()).then_some(prompt_cache)
+}
+
+fn openai_responses_usage_json(usage: &TokenUsage) -> Value {
+    let mut map = Map::new();
+    map.insert("input_tokens".into(), Value::from(usage.prompt_tokens));
+    map.insert("output_tokens".into(), Value::from(usage.completion_tokens));
+    map.insert("total_tokens".into(), Value::from(usage.total()));
+    if let Some(cached_tokens) = usage
+        .prompt_cache
+        .as_ref()
+        .and_then(|prompt_cache| prompt_cache.cached_input_tokens)
+    {
+        map.insert(
+            "input_tokens_details".into(),
+            json!({ "cached_tokens": cached_tokens }),
+        );
+    }
+    Value::Object(map)
+}
+
+fn openai_chat_usage_json(usage: &TokenUsage) -> Value {
+    let mut map = Map::new();
+    map.insert("prompt_tokens".into(), Value::from(usage.prompt_tokens));
+    map.insert(
+        "completion_tokens".into(),
+        Value::from(usage.completion_tokens),
+    );
+    map.insert("total_tokens".into(), Value::from(usage.total()));
+    if let Some(cached_tokens) = usage
+        .prompt_cache
+        .as_ref()
+        .and_then(|prompt_cache| prompt_cache.cached_input_tokens)
+    {
+        map.insert(
+            "prompt_tokens_details".into(),
+            json!({ "cached_tokens": cached_tokens }),
+        );
+    }
+    Value::Object(map)
+}
+
+fn claude_usage_json(usage: &TokenUsage) -> Value {
+    let mut map = Map::new();
+    map.insert("input_tokens".into(), Value::from(usage.prompt_tokens));
+    map.insert("output_tokens".into(), Value::from(usage.completion_tokens));
+    if let Some(prompt_cache) = &usage.prompt_cache {
+        if let Some(value) = prompt_cache.cache_read_input_tokens {
+            map.insert("cache_read_input_tokens".into(), Value::from(value));
+        }
+        if let Some(value) = prompt_cache.cache_creation_input_tokens {
+            map.insert("cache_creation_input_tokens".into(), Value::from(value));
+        }
+        if let Some(value) = prompt_cache.cache_creation_short_input_tokens {
+            map.insert("cache_creation_5m_input_tokens".into(), Value::from(value));
+        }
+        if let Some(value) = prompt_cache.cache_creation_long_input_tokens {
+            map.insert("cache_creation_1h_input_tokens".into(), Value::from(value));
+        }
+    }
+    Value::Object(map)
+}
+
+fn nested_u32(value: &Value, path: &[&str]) -> Option<u32> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    value_as_u32(current)
+}
+
+fn value_as_u32(value: &Value) -> Option<u32> {
+    value.as_u64().map(|value| value as u32)
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 fn required_str<'a>(value: &'a Value, field: &str) -> Result<&'a str, ProtocolError> {
@@ -3871,5 +4293,242 @@ mod tests {
 
         assert_eq!(parsed.model, "gemini-2.5-pro");
         assert_eq!(parsed.generation.max_output_tokens, Some(16));
+    }
+
+    fn prompt_cache_request(policy: PromptCachePolicy) -> LlmRequest {
+        LlmRequest {
+            model: "gpt-5.4".into(),
+            instructions: Some("Keep stable instructions.".into()),
+            input: vec![RequestItem::from(Message::text(MessageRole::User, "Hello"))],
+            messages: Vec::new(),
+            capabilities: CapabilitySet {
+                prompt_cache: Some(policy),
+                ..Default::default()
+            },
+            generation: GenerationConfig::default(),
+            metadata: Default::default(),
+            vendor_extensions: Default::default(),
+        }
+    }
+
+    #[test]
+    fn parse_openai_responses_response_reads_cached_input_tokens() {
+        let raw = json!({
+            "id": "resp_123",
+            "model": "gpt-5.4",
+            "status": "completed",
+            "output_text": "ok",
+            "usage": {
+                "input_tokens": 1200,
+                "input_tokens_details": { "cached_tokens": 1024 },
+                "output_tokens": 10,
+                "total_tokens": 1210
+            }
+        })
+        .to_string();
+
+        let response = parse_response(ProviderProtocol::OpenAiResponses, &raw)
+            .expect("parse openai responses response");
+
+        assert_eq!(
+            response
+                .usage
+                .prompt_cache
+                .expect("prompt cache usage")
+                .cached_input_tokens,
+            Some(1024)
+        );
+    }
+
+    #[test]
+    fn parse_openai_chat_response_and_stream_read_cached_input_tokens() {
+        let raw = json!({
+            "id": "chatcmpl_123",
+            "model": "gpt-5.4",
+            "choices": [{
+                "index": 0,
+                "finish_reason": "stop",
+                "message": { "role": "assistant", "content": "ok" }
+            }],
+            "usage": {
+                "prompt_tokens": 1200,
+                "prompt_tokens_details": { "cached_tokens": 768 },
+                "completion_tokens": 10,
+                "total_tokens": 1210
+            }
+        })
+        .to_string();
+        let response = parse_response(ProviderProtocol::OpenAiChatCompletions, &raw)
+            .expect("parse openai chat response");
+        assert_eq!(
+            response
+                .usage
+                .prompt_cache
+                .as_ref()
+                .and_then(|usage| usage.cached_input_tokens),
+            Some(768)
+        );
+
+        let frame = ProviderStreamFrame {
+            event: None,
+            data: json!({
+                "usage": {
+                    "prompt_tokens": 1200,
+                    "prompt_tokens_details": { "cached_tokens": 512 },
+                    "completion_tokens": 10,
+                    "total_tokens": 1210
+                }
+            })
+            .to_string(),
+        };
+        let events = parse_stream_events(ProviderProtocol::OpenAiChatCompletions, &frame)
+            .expect("parse usage stream chunk");
+        assert!(matches!(
+            &events[0],
+            LlmStreamEvent::Usage { usage }
+                if usage.prompt_cache.as_ref().and_then(|cache| cache.cached_input_tokens) == Some(512)
+        ));
+    }
+
+    #[test]
+    fn parse_claude_response_reads_cache_usage_tokens() {
+        let raw = json!({
+            "id": "msg_123",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-4-5",
+            "content": [{ "type": "text", "text": "ok" }],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 50,
+                "output_tokens": 10,
+                "cache_read_input_tokens": 1000,
+                "cache_creation_input_tokens": 2000,
+                "cache_creation": {
+                    "ephemeral_5m_input_tokens": 300,
+                    "ephemeral_1h_input_tokens": 400
+                }
+            }
+        })
+        .to_string();
+
+        let response =
+            parse_response(ProviderProtocol::ClaudeMessages, &raw).expect("parse claude response");
+        let prompt_cache = response.usage.prompt_cache.expect("prompt cache usage");
+        assert_eq!(prompt_cache.cache_read_input_tokens, Some(1000));
+        assert_eq!(prompt_cache.cache_creation_input_tokens, Some(2000));
+        assert_eq!(prompt_cache.cache_creation_short_input_tokens, Some(300));
+        assert_eq!(prompt_cache.cache_creation_long_input_tokens, Some(400));
+    }
+
+    #[test]
+    fn emit_openai_prompt_cache_fields_from_typed_policy() {
+        let mut request = prompt_cache_request(PromptCachePolicy::BestEffort {
+            key: Some(PromptCacheKey::Explicit {
+                value: "tenant-a".into(),
+            }),
+            retention: PromptCacheRetention::Long,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        });
+        request.vendor_extensions.insert(
+            "prompt_cache_retention".into(),
+            Value::String("in_memory".into()),
+        );
+
+        let raw = emit_request(ProviderProtocol::OpenAiResponses, &request)
+            .expect("emit openai responses request");
+        let body: Value = serde_json::from_str(&raw).expect("parse emitted request");
+
+        assert_eq!(body["prompt_cache_key"], "tenant-a");
+        assert_eq!(body["prompt_cache_retention"], "24h");
+    }
+
+    #[test]
+    fn emit_openai_required_prompt_cache_rejects_explicit_breakpoint() {
+        let request = prompt_cache_request(PromptCachePolicy::Required {
+            key: None,
+            retention: PromptCacheRetention::ProviderDefault,
+            breakpoint: CacheBreakpoint::EndOfInstructions,
+            vendor_extensions: VendorExtensions::new(),
+        });
+
+        let err = emit_request(ProviderProtocol::OpenAiResponses, &request)
+            .expect_err("required explicit breakpoint should fail");
+        assert!(matches!(err, ProtocolError::UnsupportedFeature(_)));
+    }
+
+    #[test]
+    fn emit_claude_prompt_cache_on_system_and_content_block() {
+        let request = prompt_cache_request(PromptCachePolicy::Required {
+            key: None,
+            retention: PromptCacheRetention::Long,
+            breakpoint: CacheBreakpoint::EndOfInstructions,
+            vendor_extensions: VendorExtensions::new(),
+        });
+        let raw =
+            emit_request(ProviderProtocol::ClaudeMessages, &request).expect("emit claude request");
+        let body: Value = serde_json::from_str(&raw).expect("parse emitted claude request");
+        assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
+        assert_eq!(body["system"][0]["cache_control"]["ttl"], "1h");
+
+        let block_request = LlmRequest {
+            capabilities: CapabilitySet {
+                prompt_cache: Some(PromptCachePolicy::Required {
+                    key: None,
+                    retention: PromptCacheRetention::ProviderDefault,
+                    breakpoint: CacheBreakpoint::EndOfContentBlock {
+                        message_index: 0,
+                        part_index: 1,
+                    },
+                    vendor_extensions: VendorExtensions::new(),
+                }),
+                ..Default::default()
+            },
+            instructions: None,
+            input: vec![RequestItem::from(Message {
+                role: MessageRole::User,
+                parts: vec![
+                    MessagePart::Text {
+                        text: "stable a".into(),
+                    },
+                    MessagePart::Text {
+                        text: "stable b".into(),
+                    },
+                ],
+                raw_message: None,
+                vendor_extensions: VendorExtensions::new(),
+            })],
+            ..prompt_cache_request(PromptCachePolicy::best_effort())
+        };
+        let raw = emit_request(ProviderProtocol::ClaudeMessages, &block_request)
+            .expect("emit claude content block cache request");
+        let body: Value = serde_json::from_str(&raw).expect("parse emitted claude request");
+        assert!(body["messages"][0]["content"][0]["cache_control"].is_null());
+        assert_eq!(
+            body["messages"][0]["content"][1]["cache_control"]["type"],
+            "ephemeral"
+        );
+    }
+
+    #[test]
+    fn emit_claude_required_prompt_cache_rejects_missing_breakpoint_target() {
+        let request = LlmRequest {
+            instructions: None,
+            capabilities: CapabilitySet {
+                prompt_cache: Some(PromptCachePolicy::Required {
+                    key: None,
+                    retention: PromptCacheRetention::ProviderDefault,
+                    breakpoint: CacheBreakpoint::EndOfTools,
+                    vendor_extensions: VendorExtensions::new(),
+                }),
+                ..Default::default()
+            },
+            ..prompt_cache_request(PromptCachePolicy::best_effort())
+        };
+
+        let err = emit_request(ProviderProtocol::ClaudeMessages, &request)
+            .expect_err("required missing tools breakpoint should fail");
+        assert!(matches!(err, ProtocolError::UnsupportedFeature(_)));
     }
 }

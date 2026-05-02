@@ -362,6 +362,51 @@ let capabilities = CapabilitySet {
 
 这些都是规范化抽象。具体是否受支持取决于目标协议；如果目标协议无法表达其中一部分能力，转换报告会把它标记为 `bridged`，并在必要时标记为 `lossy`。
 
+### Prompt Cache
+
+Prompt cache 位于 `LlmRequest.capabilities.prompt_cache`，旧的 `CapabilitySet.cache` 仍作为兼容提示迁移到新策略。缓存只是优化时使用 `PromptCachePolicy::BestEffort`；如果缓存语义丢失就不应发起请求，使用 `PromptCachePolicy::Required`。
+
+```rust
+use omnillm::{
+    CacheBreakpoint, CapabilitySet, PromptCacheKey, PromptCachePolicy,
+    PromptCacheRetention,
+};
+
+let capabilities = CapabilitySet {
+    prompt_cache: Some(PromptCachePolicy::BestEffort {
+        key: Some(PromptCacheKey::Explicit { value: "tenant-a".into() }),
+        retention: PromptCacheRetention::Long,
+        breakpoint: CacheBreakpoint::Auto,
+        vendor_extensions: Default::default(),
+    }),
+    ..Default::default()
+};
+```
+
+Provider 映射规则：
+
+- OpenAI Responses 与 Chat Completions 输出 `prompt_cache_key` 和 `prompt_cache_retention`，其中短期保留为 `in_memory`，长期保留为 `24h`。OpenAI 不表达显式 breakpoint；BestEffort 在 typed bridge 中记录 loss，Required 会在 transport 前报错。
+- Claude Messages 输出 provider 原生 `cache_control`，`type` 为 `ephemeral`；`Short` 映射为 `ttl: 5m`，`Long` 映射为 `ttl: 1h`，可支持 tools、system instructions、message、content block 等 breakpoint。
+- Gemini GenerateContent 没有 typed prompt cache 映射；BestEffort 会被丢弃并写入 `ConversionReport.loss_reasons`，Required 会在 transport 前失败。
+
+Provider usage 会保存在 `TokenUsage.prompt_cache`：
+
+- OpenAI 的缓存前缀命中进入 `cached_input_tokens`。
+- Claude 的缓存命中与写入进入 `cache_read_input_tokens`、`cache_creation_input_tokens`、`cache_creation_short_input_tokens`、`cache_creation_long_input_tokens`。
+
+`PromptLayoutBuilder` 可以把稳定 prefix 放在动态用户/RAG suffix 前面，并生成不包含动态内容的、租户隔离的稳定 prefix key：
+
+```rust
+use omnillm::{Message, MessageRole, PromptCacheRetention, PromptLayoutBuilder};
+
+let request = PromptLayoutBuilder::new("gpt-5.4")
+    .instructions("Answer from the stable policy document.")
+    .stable_message(Message::text(MessageRole::User, "Stable policy context"))
+    .user_input("What changed for my account?")
+    .stable_prefix_cache_key("support-bot", Some("tenant-a"), PromptCacheRetention::Long, false)
+    .build();
+```
+
 ## 非流式调用
 
 单次生成调用可以使用 `Gateway::call`：

@@ -1,0 +1,276 @@
+id: contract.multi_endpoint.transcoding
+kind: contract
+version: 1
+status: current
+summary: 多端点 canonical API 与 wire format 的转换和 transport emission
+
+sources:
+  modules:
+    - src/api_protocol.rs
+
+input:
+  parse_api_request:
+    wire_format: WireFormat
+    raw_json: string
+  emit_api_request:
+    wire_format: WireFormat
+    request: ApiRequest
+  transcode_api_request:
+    from: WireFormat
+    to: WireFormat
+    raw_json: string
+  parse_api_response:
+    wire_format: WireFormat
+    raw_json: string
+  emit_api_response:
+    wire_format: WireFormat
+    response: ApiResponse
+  transcode_api_response:
+    from: WireFormat
+    to: WireFormat
+    raw_json: string
+  emit_transport_request:
+    wire_format: WireFormat
+    request: ApiRequest
+  parse_transport_response:
+    wire_format: WireFormat
+    response: TransportResponse
+
+output:
+  parse_api_request: Result<ConversionReport<ApiRequest>, ApiProtocolError>
+  emit_api_request: Result<ConversionReport<String>, ApiProtocolError>
+  transcode_api_request: Result<ConversionReport<String>, ApiProtocolError>
+  parse_api_response: Result<ConversionReport<ApiResponse>, ApiProtocolError>
+  emit_api_response: Result<ConversionReport<String>, ApiProtocolError>
+  transcode_api_response: Result<ConversionReport<String>, ApiProtocolError>
+  emit_transport_request: Result<ConversionReport<TransportRequest>, ApiProtocolError>
+  parse_transport_response: Result<ConversionReport<ApiResponse>, ApiProtocolError>
+
+wire_format_support:
+  OpenAiResponses:
+    canonical_endpoint: Responses
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /responses
+  OpenAiChatCompletions:
+    canonical_endpoint: Responses
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /chat/completions
+  AnthropicMessages:
+    canonical_endpoint: Responses
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /messages
+  GeminiGenerateContent:
+    canonical_endpoint: Responses
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path_template: /models/{model}:generateContent
+  OpenAiEmbeddings:
+    canonical_endpoint: Embeddings
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /embeddings
+  OpenAiImageGenerations:
+    canonical_endpoint: ImageGenerations
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /images/generations
+  OpenAiAudioTranscriptions:
+    canonical_endpoint: AudioTranscriptions
+    json_request_parse: false
+    json_request_emit: false
+    json_request_error: TransportRequired
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /audio/transcriptions
+    request_body: multipart
+  OpenAiAudioSpeech:
+    canonical_endpoint: AudioSpeech
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: false
+    json_response_emit: false
+    json_response_error: TransportRequired
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /audio/speech
+    response_body: binary
+  OpenAiRerank:
+    canonical_endpoint: Rerank
+    json_request_parse: true
+    json_request_emit: true
+    json_response_parse: true
+    json_response_emit: true
+    transport_request_emit: true
+    transport_response_parse: true
+    path: /rerank
+
+transport_rules:
+  json_content_header:
+    Content-Type: application/json
+  audio_transcription_request:
+    method: Post
+    body: Multipart
+    accept: application/json
+    required_audio_variant: File
+    unsupported_audio_variant: Url
+    file_field_name: file
+    timestamp_granularity_field: timestamp_granularities[]
+  audio_speech_request:
+    method: Post
+    body: Json
+    accept_by_response_format:
+      wav: audio/wav
+      aac: audio/aac
+      flac: audio/flac
+      opus: audio/opus
+      pcm: audio/pcm
+      default: audio/mpeg
+  audio_speech_response:
+    required_body: ResponseBody::Binary
+    media_type_precedence: body_media_type_then_response_content_type
+
+generation_bridge_loss_rules:
+  OpenAiResponses: []
+  OpenAiChatCompletions:
+    dropped:
+      - builtin_tools
+      - reasoning
+  AnthropicMessages:
+    dropped:
+      - builtin_tools
+      - structured_output
+      - reasoning
+      - top_k
+      - presence_penalty
+      - frequency_penalty
+      - seed
+  GeminiGenerateContent:
+    preserved_builtin_tools:
+      - CodeExecution
+    dropped:
+      - non_code_execution_builtin_tools
+      - reasoning
+      - presence_penalty
+      - frequency_penalty
+  non_OpenAiResponses:
+    dropped:
+      - metadata
+  request_extension_loss_detection:
+    checks:
+      - top_level_vendor_extensions_when_not_OpenAiResponses_or_OpenAiChatCompletions
+      - capability_vendor_extensions
+      - generation_vendor_extensions
+      - message_raw_message
+      - message_vendor_extensions
+      - reasoning_vendor_extensions
+      - tool_vendor_extensions
+  loss_reason_deduplication: sort_then_dedup
+
+endpoint_codec_rules:
+  embeddings:
+    input_shapes:
+      - single_text_string
+      - single_token_array
+      - mixed_array_of_text_or_token_arrays
+    required_request_fields:
+      - model
+      - input
+    required_response_fields:
+      - data
+      - embedding
+  image_generations:
+    required_request_fields:
+      - prompt
+    required_response_fields:
+      - data
+    media_type_response_aliases:
+      - media_type
+      - mime_type
+  audio_transcriptions:
+    required_response_fields:
+      - text
+    duration_aliases:
+      - duration
+      - duration_seconds
+    word_text_aliases:
+      - word
+      - text
+  audio_speech:
+    required_request_fields:
+      - model
+      - input
+      - voice
+  rerank:
+    required_request_fields:
+      - model
+      - query
+      - documents
+    required_response_fields:
+      - results
+    document_shapes:
+      - text_string
+      - json_value
+
+constraints:
+  endpoint_must_match_wire_format: true
+  generation_protocol_formats_only_for_generation: true
+  transport_response_json_required_except_audio_speech: true
+  conversion_report_bridged_when_from_differs_to: true
+
+invariants:
+  - ensure_matching_endpoint_blocks_cross_endpoint_emit
+  - transport_required_formats_are_not_silently_json_encoded
+  - generation_transcode_accumulates_parse_and_emit_loss_reasons
+  - native_non_generation_conversions_are_not_marked_bridged
+  - audio_url_transcription_request_is_rejected_for_openai_multipart
+  - audio_speech_transport_response_requires_binary_body
+  - vendor_extensions_are_collected_from_unknown_fields
+  - vendor_extensions_do_not_override_known_emitted_fields
+
+semantics:
+  ensure_matching_endpoint_blocks_cross_endpoint_emit: emit_api_request、emit_api_response、emit_transport_request 先校验 endpoint。
+  transport_required_formats_are_not_silently_json_encoded: multipart 或 binary 端点在 JSON-only API 上返回 TransportRequired。
+  generation_transcode_accumulates_parse_and_emit_loss_reasons: transcode_api_request/response 合并 parsed 与 emitted loss_reasons。
+  native_non_generation_conversions_are_not_marked_bridged: Embeddings/Image/Audio/Rerank 的 OpenAI 原生格式使用 ConversionReport::native。
+  audio_url_transcription_request_is_rejected_for_openai_multipart: OpenAI transcription multipart request 不接受 AudioInput::Url。
+  audio_speech_transport_response_requires_binary_body: 非 Binary response body 解析为 InvalidShape。
+  vendor_extensions_are_collected_from_unknown_fields: parser 将未知字段收集到 vendor_extensions。
+  vendor_extensions_do_not_override_known_emitted_fields: emitter 使用 map.entry 保留已写入字段。
+
+relations:
+  depends_on:
+    - contract.multi_endpoint.model
+    - contract.generation.transcoding
+    - contract.error.model
+  extends: []
+  constrains: []
+

@@ -176,6 +176,7 @@ impl Gateway {
                                 prompt_tokens: est_prompt_tokens,
                                 completion_tokens: partial_tokens,
                                 total_tokens: Some(est_prompt_tokens + partial_tokens),
+                                prompt_cache: None,
                             };
                             pricing::actual(&partial_usage, &req.model)
                         };
@@ -195,6 +196,7 @@ impl Gateway {
                                 prompt_tokens: est_prompt_tokens,
                                 completion_tokens: partial_tokens,
                                 total_tokens: Some(est_prompt_tokens + partial_tokens),
+                                prompt_cache: None,
                             });
                             let actual = pricing::actual(&final_usage, &req.model);
                             budget.settle(est_cost, actual);

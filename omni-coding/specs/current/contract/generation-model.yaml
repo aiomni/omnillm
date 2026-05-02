@@ -1,0 +1,223 @@
+id: contract.generation.model
+kind: contract
+version: 2
+status: current
+summary: Provider-neutral generation canonical model
+
+sources:
+  modules:
+    - src/types.rs
+
+aliases:
+  VendorExtensions: BTreeMap<String, serde_json::Value>
+
+request_schema:
+  LlmRequest:
+    model: String
+    instructions: Option<String>
+    input: Vec<RequestItem>
+    messages: Vec<Message>
+    capabilities: CapabilitySet
+    generation: GenerationConfig
+    metadata: VendorExtensions
+    vendor_extensions: VendorExtensions
+  RequestItem:
+    variants:
+      - Message
+      - ToolResult
+  Message:
+    role: MessageRole
+    parts: Vec<MessagePart>
+    raw_message: Option<String>
+    vendor_extensions: VendorExtensions
+  MessageRole:
+    variants:
+      - Developer
+      - System
+      - User
+      - Assistant
+      - Tool
+  MessagePart:
+    variants:
+      - Text
+      - ImageUrl
+      - ImageBase64
+      - Audio
+      - File
+      - Json
+      - ToolCall
+      - ToolResult
+      - Reasoning
+      - Refusal
+  ToolCallPart:
+    fields:
+      call_id: String
+      name: String
+      arguments: Value
+  ToolResultPart:
+    fields:
+      call_id: String
+      name: Option<String>
+      output: Value
+      is_error: bool
+
+capability_schema:
+  CapabilitySet:
+    tools: Vec<ToolDefinition>
+    structured_output: Option<StructuredOutputConfig>
+    reasoning: Option<ReasoningCapability>
+    modalities: Vec<OutputModality>
+    safety: Option<SafetySettings>
+    cache: Option<CacheSettings>
+    prompt_cache: Option<PromptCachePolicy>
+    builtin_tools: Vec<BuiltinTool>
+    vendor_extensions: VendorExtensions
+  BuiltinTool:
+    variants:
+      - WebSearch
+      - FileSearch
+      - CodeExecution
+      - ComputerUse
+      - UrlContext
+      - Maps
+      - Mcp
+      - Vendor
+  OutputModality:
+    variants:
+      - Text
+      - Image
+      - Audio
+      - Json
+  CacheSettings:
+    role: legacy_cache_hint
+    default_enabled: true
+    target_policy: contract.prompt_cache.policy
+  PromptCachePolicy:
+    spec: contract.prompt_cache.policy
+    variants:
+      - Disabled
+      - BestEffort
+      - Required
+
+target_extensions:
+  prompt_cache_policy:
+    spec: contract.prompt_cache.policy
+    request_attachment: LlmRequest.capabilities.prompt_cache
+    response_attachment: TokenUsage.prompt_cache
+
+generation_config:
+  fields:
+    max_output_tokens: Option<u32>
+    temperature: Option<f32>
+    top_p: Option<f32>
+    top_k: Option<u32>
+    stop_sequences: Vec<String>
+    presence_penalty: Option<f32>
+    frequency_penalty: Option<f32>
+    seed: Option<u64>
+    vendor_extensions: VendorExtensions
+  default_is_all_empty: true
+
+response_schema:
+  LlmResponse:
+    output: Vec<ResponseItem>
+    messages: Vec<Message>
+    content_text: String
+    usage: TokenUsage
+    model: String
+    provider_protocol: ProviderProtocol
+    finish_reason: Option<FinishReason>
+    response_id: Option<String>
+    vendor_extensions: VendorExtensions
+  ResponseItem:
+    variants:
+      - Message
+      - ToolCall
+      - ToolResult
+      - Reasoning
+      - Refusal
+  FinishReason:
+    variants:
+      - Stop
+      - Length
+      - ToolCall
+      - ContentFilter
+      - Cancelled
+      - Error
+      - Other
+  TokenUsage:
+    prompt_tokens: u32
+    completion_tokens: u32
+    total_tokens: Option<u32>
+  LlmStreamEvent:
+    variants:
+      - ResponseStarted
+      - OutputItemAdded
+      - ContentPartAdded
+      - TextDelta
+      - ToolCallDelta
+      - ToolResult
+      - ReasoningDelta
+      - Usage
+      - Completed
+      - Error
+
+normalization:
+  normalized_input:
+    precedence: input_then_messages
+  normalized_messages:
+    precedence: messages_then_message_items_from_input
+  normalized_instructions:
+    precedence: explicit_instructions_then_system_and_developer_messages
+    separator: double_newline
+  Message::plain_text:
+    included_parts:
+      - Text
+      - Reasoning
+      - Refusal
+      - Audio.transcript
+  LlmResponse::from_message:
+    output: single_message_response_item
+    messages: single_message
+    content_text: message_plain_text
+
+token_estimation:
+  prompt_tokens: max(total_estimated_chars / 4, 1)
+  total_tokens: estimated_prompt_tokens + max_output_tokens_or_1024
+  binary_heuristics:
+    image_base64_chars: data_length / 8
+    audio_without_transcript_chars: data_length / 8
+    file_data_chars: data_length / 8
+  TokenUsage::total: total_tokens_or_prompt_plus_completion
+
+constraints:
+  input_is_execution_source_of_truth: true
+  messages_is_compatibility_view: true
+  serialization_uses_serde_tagged_enums: true
+
+invariants:
+  - normalized_input_prefers_non_empty_input
+  - normalized_messages_prefers_non_empty_messages
+  - explicit_instructions_override_folded_messages
+  - empty_capability_set_serializes_as_empty
+  - default_generation_config_serializes_as_empty
+  - token_estimate_has_minimum_one_prompt_token
+
+semantics:
+  normalized_input_prefers_non_empty_input: input 非空时不从 messages 重建执行输入。
+  normalized_messages_prefers_non_empty_messages: messages 非空时不从 input 重建兼容消息视图。
+  explicit_instructions_override_folded_messages: instructions 存在时忽略 system/developer 折叠结果。
+  empty_capability_set_serializes_as_empty: CapabilitySet::is_empty 控制 serde skip。
+  default_generation_config_serializes_as_empty: GenerationConfig::is_default 控制 serde skip。
+  token_estimate_has_minimum_one_prompt_token: prompt token 估算最小为 1。
+
+relations:
+  depends_on:
+    - contract.endpoint.protocol
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - contract.generation.transcoding
+    - contract.multi_endpoint.model
+    - contract.prompt_cache.policy
+

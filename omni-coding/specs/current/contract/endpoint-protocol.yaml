@@ -1,0 +1,156 @@
+id: contract.endpoint.protocol
+kind: contract
+version: 1
+status: current
+summary: Provider endpoint、wire protocol 与认证配置
+
+sources:
+  modules:
+    - src/protocol.rs
+
+protocols:
+  ProviderProtocol:
+    variants:
+      - OpenAiResponses
+      - OpenAiChatCompletions
+      - ClaudeMessages
+      - GeminiGenerateContent
+  EndpointProtocol:
+    official:
+      - OpenAiResponses
+      - OpenAiChatCompletions
+      - ClaudeMessages
+      - GeminiGenerateContent
+    compat:
+      - OpenAiResponsesCompat
+      - OpenAiChatCompletionsCompat
+      - ClaudeMessagesCompat
+      - GeminiGenerateContentCompat
+    wire_mapping:
+      OpenAiResponses: OpenAiResponses
+      OpenAiResponsesCompat: OpenAiResponses
+      OpenAiChatCompletions: OpenAiChatCompletions
+      OpenAiChatCompletionsCompat: OpenAiChatCompletions
+      ClaudeMessages: ClaudeMessages
+      ClaudeMessagesCompat: ClaudeMessages
+      GeminiGenerateContent: GeminiGenerateContent
+      GeminiGenerateContentCompat: GeminiGenerateContent
+
+parse_aliases:
+  OpenAiResponses:
+    - responses
+    - openai_responses
+    - open_ai_responses
+  OpenAiChatCompletions:
+    - chat_completions
+    - openai_chat_completions
+    - open_ai_chat_completions
+  ClaudeMessages:
+    - claude_messages
+    - anthropic_messages
+  GeminiGenerateContent:
+    - gemini_generate_content
+  OpenAiResponsesCompat:
+    - responses_compat
+    - openai_responses_compat
+    - open_ai_responses_compat
+  OpenAiChatCompletionsCompat:
+    - chat_completions_compat
+    - openai_chat_completions_compat
+    - open_ai_chat_completions_compat
+  ClaudeMessagesCompat:
+    - claude_messages_compat
+    - anthropic_messages_compat
+  GeminiGenerateContentCompat:
+    - gemini_generate_content_compat
+
+auth:
+  AuthScheme:
+    variants:
+      - Bearer
+      - Header
+      - Query
+  default_for_wire_protocol:
+    OpenAiResponses: Bearer
+    OpenAiChatCompletions: Bearer
+    ClaudeMessages:
+      Header: x-api-key
+    GeminiGenerateContent:
+      Header: x-goog-api-key
+
+provider_endpoint:
+  fields:
+    protocol: EndpointProtocol
+    base_url: String
+    auth: Option<AuthScheme>
+    default_headers: BTreeMap<String, String>
+  constructors:
+    openai_responses:
+      protocol: OpenAiResponses
+      base_url: https://api.openai.com/v1
+    openai_chat_completions:
+      protocol: OpenAiChatCompletions
+      base_url: https://api.openai.com/v1
+    claude_messages:
+      protocol: ClaudeMessages
+      base_url: https://api.anthropic.com/v1
+    gemini_generate_content:
+      protocol: GeminiGenerateContent
+      base_url: https://generativelanguage.googleapis.com
+  default_headers_by_wire_protocol:
+    ClaudeMessages:
+      anthropic-version: "2023-06-01"
+
+url_derivation:
+  compat: trimmed_base_url_as_final_request_url
+  official:
+    OpenAiResponses: append_or_keep_/responses
+    OpenAiChatCompletions: append_or_keep_/chat/completions
+    ClaudeMessages: append_or_keep_/messages
+    GeminiGenerateContent:
+      base_prefix: append_or_keep_/v1beta
+      non_stream: /models/{model}:generateContent
+      stream: /models/{model}:streamGenerateContent?alt=sse
+
+operations:
+  ProviderEndpoint::with_default_header:
+    input:
+      name: String
+      value: String
+    output: ProviderEndpoint
+  ProviderEndpoint::with_auth:
+    input:
+      auth: AuthScheme
+    output: ProviderEndpoint
+  ProviderEndpoint::auth_scheme:
+    output: AuthScheme
+  ProviderEndpoint::wire_protocol:
+    output: ProviderProtocol
+
+constraints:
+  compat_urls_are_not_path_derived: true
+  auth_override_precedence: explicit_auth_then_default_for_protocol
+  claude_default_version_header: true
+
+invariants:
+  - endpoint_protocol_maps_to_one_wire_protocol
+  - compat_endpoint_uses_base_url_verbatim_after_trim
+  - official_endpoint_avoids_duplicate_terminal_path
+  - gemini_stream_url_uses_alt_sse
+  - explicit_auth_overrides_default_auth
+
+semantics:
+  endpoint_protocol_maps_to_one_wire_protocol: Runtime EndpointProtocol 始终可转换到 generation ProviderProtocol。
+  compat_endpoint_uses_base_url_verbatim_after_trim: 兼容模式不会追加标准路径。
+  official_endpoint_avoids_duplicate_terminal_path: base_url 已以目标路径结尾时不重复追加。
+  gemini_stream_url_uses_alt_sse: Gemini 流式 URL 使用 streamGenerateContent 并追加 alt=sse。
+  explicit_auth_overrides_default_auth: ProviderEndpoint.auth 存在时优先于协议默认认证。
+
+relations:
+  depends_on:
+    - system.omnillm.runtime
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - contract.generation.transcoding
+

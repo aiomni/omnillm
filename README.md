@@ -165,6 +165,48 @@ construct chat input with `Message.parts`: OmniLLM emits plain-text chat
 messages as typed `content` arrays such as
 `[{ "type": "text", "text": "hi?" }]`.
 
+## Prompt Cache
+
+OmniLLM exposes prompt caching as a typed generation capability instead of a raw provider-only JSON escape hatch:
+
+```rust
+use omnillm::{
+    CacheBreakpoint, CapabilitySet, PromptCacheKey, PromptCachePolicy,
+    PromptCacheRetention,
+};
+
+let capabilities = CapabilitySet {
+    prompt_cache: Some(PromptCachePolicy::BestEffort {
+        key: Some(PromptCacheKey::Explicit { value: "tenant-a".into() }),
+        retention: PromptCacheRetention::Long,
+        breakpoint: CacheBreakpoint::Auto,
+        vendor_extensions: Default::default(),
+    }),
+    ..Default::default()
+};
+```
+
+Provider behavior is intentionally explicit:
+
+- OpenAI Responses and Chat Completions emit `prompt_cache_key` and `prompt_cache_retention`; OpenAI breakpoint requests are partial support because caching is automatic prefix matching.
+- Claude Messages emits provider-native `cache_control` on supported tool, system, message, or content-block boundaries.
+- Gemini GenerateContent does not support typed prompt cache; `BestEffort` becomes a lossy bridge report and `Required` returns an error before transport.
+- `TokenUsage.prompt_cache` preserves cached/read/write token telemetry so callers can verify cache hits from provider usage, not assumptions.
+- Budget estimates stay conservative and do not assume cache hits; actual settlement applies cache-aware pricing only when both provider telemetry and known cache rates are present.
+
+For safer stable-prefix construction, use `PromptLayoutBuilder` to keep dynamic user/RAG content in the suffix and generate stable prefix keys that exclude dynamic content:
+
+```rust
+use omnillm::{Message, MessageRole, PromptLayoutBuilder, PromptCacheRetention};
+
+let request = PromptLayoutBuilder::new("gpt-5.4")
+    .instructions("Answer using the stable policy document.")
+    .stable_message(Message::text(MessageRole::User, "Stable policy context"))
+    .user_input("What changed for my account?")
+    .stable_prefix_cache_key("support-bot", Some("tenant-a"), PromptCacheRetention::Long, false)
+    .build();
+```
+
 ## Protocol Transcoding
 
 ```rust

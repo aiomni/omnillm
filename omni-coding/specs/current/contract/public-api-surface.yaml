@@ -1,0 +1,171 @@
+id: contract.public_api.surface
+kind: contract
+version: 1
+status: current
+summary: OmniLLM crate 对外导出的 API Surface
+
+sources:
+  modules:
+    - src/lib.rs
+
+module_exports:
+  public_modules:
+    - api
+    - api_protocol
+    - budget
+    - config
+    - error
+    - key
+    - protocol
+    - provider_registry
+    - replay
+    - types
+  private_modules:
+    - dispatcher
+    - limiter
+    - pricing
+    - gateway
+
+reexports:
+  api:
+    - ApiRequest
+    - ApiResponse
+    - AudioInput
+    - AudioSegment
+    - AudioSpeechRequest
+    - AudioSpeechResponse
+    - AudioTranscriptionRequest
+    - AudioTranscriptionResponse
+    - ConversionReport
+    - EmbeddingInput
+    - EmbeddingRequest
+    - EmbeddingResponse
+    - EmbeddingUsage
+    - EmbeddingVector
+    - EndpointKind
+    - GeneratedImage
+    - HttpMethod
+    - ImageGenerationRequest
+    - ImageGenerationResponse
+    - MultipartField
+    - MultipartValue
+    - ProviderKind
+    - RequestBody
+    - RerankDocument
+    - RerankRequest
+    - RerankResponse
+    - RerankResult
+    - RerankUsage
+    - ResponseBody
+    - TranscribedWord
+    - TransportRequest
+    - TransportResponse
+    - WireFormat
+  api_protocol:
+    - ApiProtocolError
+    - emit_api_request
+    - emit_api_response
+    - emit_transport_request
+    - parse_api_request
+    - parse_api_response
+    - parse_transport_response
+    - transcode_api_request
+    - transcode_api_response
+  budget:
+    - BudgetTracker
+  config:
+    - GatewayConfig
+    - KeyConfig
+    - PoolConfig
+  error:
+    - GatewayError
+    - ProviderError
+  gateway:
+    - Gateway
+    - GatewayBuilder
+    - GatewayStream
+  key:
+    - KeyLease
+    - KeyStatus
+  protocol:
+    - AuthScheme
+    - EndpointProtocol
+    - ProtocolError
+    - ProviderEndpoint
+    - ProviderProtocol
+    - ProviderStreamFrame
+    - emit_error
+    - emit_request
+    - emit_response
+    - emit_stream_event
+    - parse_error
+    - parse_request
+    - parse_response
+    - parse_stream_event
+    - transcode_error
+    - transcode_request
+    - transcode_response
+    - transcode_stream_event
+  provider_registry:
+    - EndpointSupport
+    - ProviderDescriptor
+    - ProviderRegistry
+    - SupportLevel
+    - embedded_provider_registry
+  replay:
+    - ReplayFixture
+    - sanitize_json_value
+    - sanitize_transport_request
+    - sanitize_transport_response
+  types:
+    - BuiltinTool
+    - CacheBreakpoint
+    - CacheSettings
+    - CapabilitySet
+    - FinishReason
+    - GenerationConfig
+    - LlmRequest
+    - LlmResponse
+    - LlmStreamEvent
+    - Message
+    - MessagePart
+    - MessageRole
+    - OutputModality
+    - PromptCacheKey
+    - PromptCachePolicy
+    - PromptCacheRetention
+    - PromptCacheUsage
+    - PromptLayoutBuilder
+    - ReasoningCapability
+    - RequestItem
+    - ResponseItem
+    - SafetySettings
+    - StructuredOutputConfig
+    - TokenUsage
+    - ToolCallPart
+    - ToolDefinition
+    - ToolResultPart
+    - VendorExtensions
+
+constraints:
+  dispatcher_is_not_public: true
+  limiter_is_not_public: true
+  pricing_is_not_public: true
+  gateway_module_path_is_not_public: true
+
+invariants:
+  - public_api_flows_through_reexports
+  - private_modules_remain_internal_implementation
+  - exported_types_match_current_contract_specs
+
+semantics:
+  public_api_flows_through_reexports: 用户侧稳定入口是 omnillm crate root 的 reexport。
+  private_modules_remain_internal_implementation: dispatcher、limiter、pricing 不构成公开兼容性承诺。
+  exported_types_match_current_contract_specs: reexport 的类型行为由对应 current contract 或 capability Spec 约束。
+
+relations:
+  depends_on:
+    - system.omnillm.runtime
+  extends: []
+  constrains: []
+

@@ -1,0 +1,55 @@
+id: patch.prompt_cache.policy
+kind: patch
+created: 2026-05-02
+status: applied
+summary: 新增 provider-native prompt cache policy contract 并同步相关 specs
+
+operations:
+  - op: create
+    target: contract.prompt_cache.policy
+    reason: 将 OpenAI Prompt Caching 与 Claude Prompt Caching 的 provider-native 语义沉淀为统一目标 contract。
+  - op: update
+    target: contract.generation.model
+    expected_version: 1
+    reason: 标记现有 CacheSettings 为 legacy hint，并引用 PromptCachePolicy 目标模型。
+    changes:
+      set:
+        version: 2
+      add:
+        capability_schema.CacheSettings.role: legacy_cache_hint
+        target_extensions.prompt_cache_policy: contract.prompt_cache.policy
+        relations.constrains: contract.prompt_cache.policy
+  - op: update
+    target: contract.generation.transcoding
+    expected_version: 1
+    reason: 增加当前不支持 typed prompt cache 的 wire mapping 状态与目标关系。
+    changes:
+      set:
+        version: 2
+      add:
+        prompt_cache_support_state: planned_by_contract.prompt_cache.policy
+        relations.constrains: contract.prompt_cache.policy
+  - op: update
+    target: capability.budget.cost
+    expected_version: 1
+    reason: 明确 cache pricing 依赖 provider usage telemetry 和 provider-specific rates。
+    changes:
+      set:
+        version: 2
+      add:
+        prompt_cache_pricing_state: planned_by_contract.prompt_cache.policy
+        relations.constrains: contract.prompt_cache.policy
+  - op: update
+    target: system.src.coverage
+    expected_version: 1
+    reason: 把 prompt cache target contract 关联到受影响 src 模块。
+    changes:
+      set:
+        version: 2
+      add:
+        required_spec_ids: contract.prompt_cache.policy
+        coverage.src/types.rs: contract.prompt_cache.policy
+        coverage.src/protocol.rs: contract.prompt_cache.policy
+        coverage.src/api_protocol.rs: contract.prompt_cache.policy
+        coverage.src/pricing.rs: contract.prompt_cache.policy
+        coverage.src/gateway.rs: contract.prompt_cache.policy

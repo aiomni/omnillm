@@ -1,0 +1,198 @@
+id: contract.provider.registry
+kind: contract
+version: 1
+status: current
+summary: 内嵌 provider support matrix 与查询接口
+
+sources:
+  modules:
+    - src/provider_registry.rs
+  data:
+    - support/provider_support_matrix.json
+
+types:
+  SupportLevel:
+    variants:
+      - Native
+      - Compatible
+      - Planned
+  EndpointSupport:
+    fields:
+      - name: endpoint
+        type: EndpointKind
+      - name: level
+        type: SupportLevel
+      - name: wire_formats
+        type: Vec<WireFormat>
+      - name: notes
+        type: Vec<String>
+  ProviderDescriptor:
+    fields:
+      - name: kind
+        type: ProviderKind
+      - name: display_name
+        type: String
+      - name: default_base_url
+        type: Option<String>
+      - name: endpoints
+        type: Vec<EndpointSupport>
+      - name: notes
+        type: Vec<String>
+  ProviderRegistry:
+    fields:
+      providers: Vec<ProviderDescriptor>
+
+operations:
+  EndpointSupport::supports_wire_format:
+    input:
+      wire_format: WireFormat
+    output: bool
+  EndpointSupport::is_enabled:
+    output: bool
+  ProviderDescriptor::endpoint:
+    input:
+      endpoint: EndpointKind
+    output: Option<EndpointSupport>
+  ProviderDescriptor::supports_endpoint:
+    input:
+      endpoint: EndpointKind
+    output: bool
+  ProviderDescriptor::supports_wire_format:
+    input:
+      wire_format: WireFormat
+    output: bool
+  ProviderRegistry::embedded:
+    output: ProviderRegistry
+  ProviderRegistry::provider:
+    input:
+      kind: ProviderKind
+    output: Option<ProviderDescriptor>
+  ProviderRegistry::supports_endpoint:
+    input:
+      provider: ProviderKind
+      endpoint: EndpointKind
+    output: bool
+  ProviderRegistry::supports_wire_format:
+    input:
+      provider: ProviderKind
+      wire_format: WireFormat
+    output: bool
+
+embedded_matrix:
+  OpenAi:
+    default_base_url: https://api.openai.com/v1
+    endpoints:
+      Responses:
+        level: Native
+        wire_formats: [OpenAiResponses]
+      ChatCompletions:
+        level: Native
+        wire_formats: [OpenAiChatCompletions]
+      Embeddings:
+        level: Native
+        wire_formats: [OpenAiEmbeddings]
+      ImageGenerations:
+        level: Native
+        wire_formats: [OpenAiImageGenerations]
+      AudioTranscriptions:
+        level: Native
+        wire_formats: [OpenAiAudioTranscriptions]
+      AudioSpeech:
+        level: Native
+        wire_formats: [OpenAiAudioSpeech]
+  AzureOpenAi:
+    endpoints:
+      Responses:
+        level: Compatible
+        wire_formats: [OpenAiResponses]
+      ChatCompletions:
+        level: Compatible
+        wire_formats: [OpenAiChatCompletions]
+      Embeddings:
+        level: Compatible
+        wire_formats: [OpenAiEmbeddings]
+      ImageGenerations:
+        level: Compatible
+        wire_formats: [OpenAiImageGenerations]
+      AudioTranscriptions:
+        level: Compatible
+        wire_formats: [OpenAiAudioTranscriptions]
+      AudioSpeech:
+        level: Compatible
+        wire_formats: [OpenAiAudioSpeech]
+  Anthropic:
+    default_base_url: https://api.anthropic.com/v1
+    endpoints:
+      Messages:
+        level: Native
+        wire_formats: [AnthropicMessages]
+  Gemini:
+    default_base_url: https://generativelanguage.googleapis.com/v1beta
+    endpoints:
+      Messages:
+        level: Native
+        wire_formats: [GeminiGenerateContent]
+      Embeddings:
+        level: Planned
+        wire_formats: []
+  VertexAi:
+    endpoints:
+      Messages:
+        level: Compatible
+        wire_formats: [GeminiGenerateContent]
+      Rerank:
+        level: Planned
+        wire_formats: []
+  Bedrock:
+    endpoints:
+      Messages:
+        level: Planned
+        wire_formats: []
+  OpenAiCompatible:
+    endpoints:
+      Responses:
+        level: Compatible
+        wire_formats: [OpenAiResponses]
+      ChatCompletions:
+        level: Compatible
+        wire_formats: [OpenAiChatCompletions]
+      Embeddings:
+        level: Compatible
+        wire_formats: [OpenAiEmbeddings]
+      ImageGenerations:
+        level: Compatible
+        wire_formats: [OpenAiImageGenerations]
+      AudioTranscriptions:
+        level: Compatible
+        wire_formats: [OpenAiAudioTranscriptions]
+      AudioSpeech:
+        level: Compatible
+        wire_formats: [OpenAiAudioSpeech]
+      Rerank:
+        level: Compatible
+        wire_formats: [OpenAiRerank]
+
+constraints:
+  embedded_registry_source: include_str_support_provider_support_matrix_json
+  planned_endpoint_enabled: false
+  endpoint_enabled_requires_non_empty_wire_formats: true
+
+invariants:
+  - embedded_matrix_must_deserialize
+  - planned_support_is_not_enabled
+  - support_lookup_missing_provider_returns_false
+  - support_lookup_missing_endpoint_returns_false
+  - wire_format_support_uses_endpoint_wire_format_membership
+
+semantics:
+  embedded_matrix_must_deserialize: ProviderRegistry::embedded 对内嵌 JSON 反序列化失败会 panic。
+  planned_support_is_not_enabled: EndpointSupport::is_enabled 对 Planned 返回 false。
+  support_lookup_missing_provider_returns_false: registry 查询未知 provider 返回 false。
+  support_lookup_missing_endpoint_returns_false: provider 查询未知 endpoint 返回 false。
+  wire_format_support_uses_endpoint_wire_format_membership: provider 支持任意 endpoint 中包含的 wire format 即返回 true。
+
+relations:
+  depends_on:
+    - contract.multi_endpoint.model
+  extends: []
+  constrains: []

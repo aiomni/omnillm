@@ -1,0 +1,251 @@
+id: contract.generation.transcoding
+kind: contract
+version: 2
+status: current
+summary: Generation canonical model 与 provider wire protocol 的转换
+
+sources:
+  modules:
+    - src/protocol.rs
+
+input:
+  parse_request:
+    protocol: ProviderProtocol
+    raw_json: string
+  emit_request:
+    protocol: ProviderProtocol
+    request: LlmRequest
+  transcode_request:
+    from: ProviderProtocol
+    to: ProviderProtocol
+    raw_json: string
+  parse_response:
+    protocol: ProviderProtocol
+    raw_json: string
+  emit_response:
+    protocol: ProviderProtocol
+    response: LlmResponse
+  transcode_response:
+    from: ProviderProtocol
+    to: ProviderProtocol
+    raw_json: string
+  parse_error:
+    protocol: ProviderProtocol
+    status: Option<u16>
+    raw_json: string
+  emit_error:
+    protocol: ProviderProtocol
+    error: ProviderError
+  parse_stream_event:
+    protocol: ProviderProtocol
+    frame: ProviderStreamFrame
+  emit_stream_event:
+    protocol: ProviderProtocol
+    event: LlmStreamEvent
+
+output:
+  parse_request: Result<LlmRequest, ProtocolError>
+  emit_request: Result<String, ProtocolError>
+  transcode_request: Result<String, ProtocolError>
+  parse_response: Result<LlmResponse, ProtocolError>
+  emit_response: Result<String, ProtocolError>
+  transcode_response: Result<String, ProtocolError>
+  parse_error: Result<ProviderError, ProtocolError>
+  emit_error: Result<String, ProtocolError>
+  parse_stream_event: Result<Option<LlmStreamEvent>, ProtocolError>
+  emit_stream_event: Result<Option<ProviderStreamFrame>, ProtocolError>
+
+wire_protocol_support:
+  OpenAiResponses:
+    request_fields:
+      - model
+      - instructions
+      - input
+      - tools
+      - text.format
+      - reasoning
+      - generation_common
+      - metadata
+      - stream
+    response_fields:
+      - output
+      - output_text
+      - usage.input_tokens
+      - usage.output_tokens
+      - usage.total_tokens
+      - id
+      - model
+      - status
+    supports_builtin_tools: true
+    supports_structured_output: true
+    supports_reasoning: true
+    emits_vendor_extensions: true
+  OpenAiChatCompletions:
+    request_fields:
+      - model
+      - messages
+      - tools
+      - response_format.json_schema
+      - generation_common
+      - stream
+    response_fields:
+      - choices[0].message
+      - choices[0].finish_reason
+      - usage.prompt_tokens
+      - usage.completion_tokens
+      - usage.total_tokens
+      - id
+      - model
+    supports_builtin_tools: false
+    supports_structured_output: true
+    supports_reasoning: false
+  ClaudeMessages:
+    request_fields:
+      - model
+      - system
+      - messages
+      - max_tokens
+      - tools
+      - temperature
+      - top_p
+      - stop_sequences
+      - stream
+    response_fields:
+      - id
+      - model
+      - content
+      - stop_reason
+      - usage.input_tokens
+      - usage.output_tokens
+    supports_builtin_tools: false
+    supports_structured_output: false
+    supports_reasoning: false
+  GeminiGenerateContent:
+    request_fields:
+      - model
+      - contents
+      - systemInstruction
+      - tools
+      - generationConfig
+    response_fields:
+      - candidates[0].content
+      - candidates[0].finishReason
+      - usageMetadata.promptTokenCount
+      - usageMetadata.candidatesTokenCount
+      - usageMetadata.totalTokenCount
+      - modelVersion
+      - responseId
+    supports_builtin_tools:
+      - CodeExecution
+    supports_structured_output: true
+    supports_reasoning: false
+
+content_mapping:
+  canonical_parts:
+    - Text
+    - ImageUrl
+    - ImageBase64
+    - Audio
+    - File
+    - Json
+    - ToolCall
+    - ToolResult
+    - Reasoning
+    - Refusal
+  raw_message_preservation: parsed_messages_store_raw_message_when_available
+  tool_arguments: string_json_is_parsed_to_Value_when_possible
+
+streaming:
+  ProviderStreamFrame:
+    event: Option<String>
+    data: String
+  sse_frame_split:
+    newline_normalization: crlf_to_lf
+    delimiter: blank_line
+    data_lines: joined_with_newline
+  done_marker: "[DONE]"
+  parse_stream_events: can_return_multiple_canonical_events
+  parse_stream_event: returns_first_non_ResponseStarted_or_first_started
+  emitted_none_events:
+    OpenAiResponses:
+      - Usage
+      - ContentPartAdded
+      - ToolResult
+    OpenAiChatCompletions:
+      - ContentPartAdded
+      - OutputItemAdded
+      - ToolResult
+      - ReasoningDelta
+      - Error
+    ClaudeMessages:
+      - ContentPartAdded
+      - OutputItemAdded
+      - ToolCallDelta
+      - ToolResult
+      - ReasoningDelta
+    GeminiGenerateContent:
+      - ResponseStarted
+      - OutputItemAdded
+      - ContentPartAdded
+      - ToolCallDelta
+      - ToolResult
+      - ReasoningDelta
+      - Error
+
+prompt_cache_support_state:
+  typed_policy_mapping: implemented_by_contract.prompt_cache.policy
+  current_openai_top_level_vendor_extension_passthrough: true
+  current_openai_typed_emit: true
+  current_claude_cache_control_emit: true
+  current_prompt_cache_usage_parse: true
+  required_policy_error: ProtocolError::UnsupportedFeature
+  best_effort_loss_report: ConversionReport.loss_reasons
+
+errors:
+  ProtocolError:
+    variants:
+      - Json
+      - MissingField
+      - InvalidShape
+      - UnsupportedFeature
+  provider_error_parsers:
+    OpenAiResponses: parse_openai_error
+    OpenAiChatCompletions: parse_openai_error
+    ClaudeMessages: parse_claude_error
+    GeminiGenerateContent: parse_gemini_error
+
+constraints:
+  transcode_is_parse_then_emit: true
+  unsupported_target_features_return_error: true
+  response_parse_uses_first_choice_or_candidate: true
+  missing_usage_defaults_to_zero_tokens: true
+
+invariants:
+  - parsed_requests_are_canonical_llm_requests
+  - parsed_responses_are_canonical_llm_responses
+  - emitted_requests_respect_target_wire_shape
+  - emitted_responses_respect_target_wire_shape
+  - stream_done_marker_emits_no_event
+  - provider_errors_are_normalized
+  - unsupported_protocol_features_are_not_silently_emitted
+
+semantics:
+  parsed_requests_are_canonical_llm_requests: 所有 provider request parser 输出 LlmRequest。
+  parsed_responses_are_canonical_llm_responses: 所有 provider response parser 输出 LlmResponse。
+  emitted_requests_respect_target_wire_shape: emit_request 根据目标 ProviderProtocol 输出对应 JSON shape。
+  emitted_responses_respect_target_wire_shape: emit_response 根据目标 ProviderProtocol 输出对应 JSON shape。
+  stream_done_marker_emits_no_event: data 为 [DONE] 的 SSE frame 返回空事件集合。
+  provider_errors_are_normalized: parse_error 输出 ProviderError，emit_error 输出目标 provider error JSON。
+  unsupported_protocol_features_are_not_silently_emitted: protocol 层遇到不支持能力返回 UnsupportedFeature。
+
+relations:
+  depends_on:
+    - contract.generation.model
+    - contract.endpoint.protocol
+    - contract.error.model
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - contract.multi_endpoint.transcoding
+    - contract.prompt_cache.policy
+

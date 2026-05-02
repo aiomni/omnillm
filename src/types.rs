@@ -354,6 +354,8 @@ pub struct CapabilitySet {
     pub safety: Option<SafetySettings>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache: Option<CacheSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache: Option<PromptCachePolicy>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub builtin_tools: Vec<BuiltinTool>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -368,8 +370,17 @@ impl CapabilitySet {
             && self.modalities.is_empty()
             && self.safety.is_none()
             && self.cache.is_none()
+            && self.prompt_cache.is_none()
             && self.builtin_tools.is_empty()
             && self.vendor_extensions.is_empty()
+    }
+
+    pub fn effective_prompt_cache(&self) -> Option<PromptCachePolicy> {
+        self.prompt_cache.clone().or_else(|| {
+            self.cache
+                .clone()
+                .map(PromptCachePolicy::from_legacy_cache_settings)
+        })
     }
 }
 
@@ -454,6 +465,184 @@ pub struct CacheSettings {
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub vendor_extensions: VendorExtensions,
+}
+
+/// Provider-neutral prompt cache policy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum PromptCachePolicy {
+    Disabled,
+    BestEffort {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        key: Option<PromptCacheKey>,
+        #[serde(
+            default,
+            skip_serializing_if = "PromptCacheRetention::is_provider_default"
+        )]
+        retention: PromptCacheRetention,
+        #[serde(default, skip_serializing_if = "CacheBreakpoint::is_auto")]
+        breakpoint: CacheBreakpoint,
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        vendor_extensions: VendorExtensions,
+    },
+    Required {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        key: Option<PromptCacheKey>,
+        #[serde(
+            default,
+            skip_serializing_if = "PromptCacheRetention::is_provider_default"
+        )]
+        retention: PromptCacheRetention,
+        #[serde(default, skip_serializing_if = "CacheBreakpoint::is_auto")]
+        breakpoint: CacheBreakpoint,
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        vendor_extensions: VendorExtensions,
+    },
+}
+
+impl PromptCachePolicy {
+    pub fn best_effort() -> Self {
+        Self::BestEffort {
+            key: None,
+            retention: PromptCacheRetention::ProviderDefault,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        }
+    }
+
+    pub fn required() -> Self {
+        Self::Required {
+            key: None,
+            retention: PromptCacheRetention::ProviderDefault,
+            breakpoint: CacheBreakpoint::Auto,
+            vendor_extensions: VendorExtensions::new(),
+        }
+    }
+
+    pub fn from_legacy_cache_settings(settings: CacheSettings) -> Self {
+        if settings.enabled {
+            Self::BestEffort {
+                key: None,
+                retention: PromptCacheRetention::ProviderDefault,
+                breakpoint: CacheBreakpoint::Auto,
+                vendor_extensions: settings.vendor_extensions,
+            }
+        } else {
+            Self::Disabled
+        }
+    }
+
+    pub fn is_required(&self) -> bool {
+        matches!(self, Self::Required { .. })
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        matches!(self, Self::Disabled)
+    }
+
+    pub fn key(&self) -> Option<&PromptCacheKey> {
+        match self {
+            Self::Disabled => None,
+            Self::BestEffort { key, .. } | Self::Required { key, .. } => key.as_ref(),
+        }
+    }
+
+    pub fn retention(&self) -> PromptCacheRetention {
+        match self {
+            Self::Disabled => PromptCacheRetention::ProviderDefault,
+            Self::BestEffort { retention, .. } | Self::Required { retention, .. } => *retention,
+        }
+    }
+
+    pub fn breakpoint(&self) -> CacheBreakpoint {
+        match self {
+            Self::Disabled => CacheBreakpoint::Auto,
+            Self::BestEffort { breakpoint, .. } | Self::Required { breakpoint, .. } => {
+                breakpoint.clone()
+            }
+        }
+    }
+}
+
+/// Provider cache key input.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum PromptCacheKey {
+    Explicit {
+        value: String,
+    },
+    StablePrefixHash {
+        namespace: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tenant_scope: Option<String>,
+    },
+}
+
+/// Provider-neutral cache retention intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptCacheRetention {
+    #[default]
+    ProviderDefault,
+    Short,
+    Long,
+}
+
+impl PromptCacheRetention {
+    pub fn is_provider_default(&self) -> bool {
+        *self == Self::ProviderDefault
+    }
+}
+
+/// Cacheable-prefix boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CacheBreakpoint {
+    #[default]
+    Auto,
+    EndOfTools,
+    EndOfInstructions,
+    EndOfMessage {
+        index: usize,
+    },
+    EndOfContentBlock {
+        message_index: usize,
+        part_index: usize,
+    },
+}
+
+impl CacheBreakpoint {
+    pub fn is_auto(&self) -> bool {
+        matches!(self, Self::Auto)
+    }
+}
+
+/// Provider-reported prompt cache usage.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PromptCacheUsage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_input_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_read_input_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_creation_input_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_creation_short_input_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_creation_long_input_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub vendor_extensions: VendorExtensions,
+}
+
+impl PromptCacheUsage {
+    pub fn is_empty(&self) -> bool {
+        self.cached_input_tokens.is_none()
+            && self.cache_read_input_tokens.is_none()
+            && self.cache_creation_input_tokens.is_none()
+            && self.cache_creation_short_input_tokens.is_none()
+            && self.cache_creation_long_input_tokens.is_none()
+            && self.vendor_extensions.is_empty()
+    }
 }
 
 fn default_true() -> bool {
@@ -585,6 +774,8 @@ pub struct TokenUsage {
     pub completion_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache: Option<PromptCacheUsage>,
 }
 
 impl TokenUsage {
@@ -593,6 +784,170 @@ impl TokenUsage {
         self.total_tokens
             .unwrap_or(self.prompt_tokens + self.completion_tokens)
     }
+}
+
+/// Helper for constructing cache-friendly prompt layouts.
+#[derive(Debug, Clone)]
+pub struct PromptLayoutBuilder {
+    model: String,
+    instructions: Option<String>,
+    tools: Vec<ToolDefinition>,
+    stable_messages: Vec<Message>,
+    dynamic_messages: Vec<Message>,
+    generation: GenerationConfig,
+    prompt_cache: Option<PromptCachePolicy>,
+    generated_key: Option<GeneratedPromptCacheKey>,
+}
+
+#[derive(Debug, Clone)]
+struct GeneratedPromptCacheKey {
+    namespace: String,
+    tenant_scope: Option<String>,
+    required: bool,
+    retention: PromptCacheRetention,
+}
+
+impl PromptLayoutBuilder {
+    pub fn new(model: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            instructions: None,
+            tools: Vec::new(),
+            stable_messages: Vec::new(),
+            dynamic_messages: Vec::new(),
+            generation: GenerationConfig::default(),
+            prompt_cache: None,
+            generated_key: None,
+        }
+    }
+
+    pub fn instructions(mut self, instructions: impl Into<String>) -> Self {
+        self.instructions = Some(instructions.into());
+        self
+    }
+
+    pub fn tool(mut self, tool: ToolDefinition) -> Self {
+        self.tools.push(tool);
+        self
+    }
+
+    pub fn stable_message(mut self, message: Message) -> Self {
+        self.stable_messages.push(message);
+        self
+    }
+
+    pub fn dynamic_message(mut self, message: Message) -> Self {
+        self.dynamic_messages.push(message);
+        self
+    }
+
+    pub fn user_input(self, text: impl Into<String>) -> Self {
+        self.dynamic_message(Message::text(MessageRole::User, text))
+    }
+
+    pub fn dynamic_rag_context(self, value: Value) -> Self {
+        self.dynamic_message(Message {
+            role: MessageRole::User,
+            parts: vec![MessagePart::Json { value }],
+            raw_message: None,
+            vendor_extensions: VendorExtensions::new(),
+        })
+    }
+
+    pub fn generation(mut self, generation: GenerationConfig) -> Self {
+        self.generation = generation;
+        self
+    }
+
+    pub fn prompt_cache(mut self, policy: PromptCachePolicy) -> Self {
+        self.prompt_cache = Some(policy);
+        self.generated_key = None;
+        self
+    }
+
+    pub fn stable_prefix_cache_key(
+        mut self,
+        namespace: impl Into<String>,
+        tenant_scope: Option<impl Into<String>>,
+        retention: PromptCacheRetention,
+        required: bool,
+    ) -> Self {
+        self.generated_key = Some(GeneratedPromptCacheKey {
+            namespace: namespace.into(),
+            tenant_scope: tenant_scope.map(Into::into),
+            required,
+            retention,
+        });
+        self.prompt_cache = None;
+        self
+    }
+
+    pub fn build(mut self) -> LlmRequest {
+        if let Some(generated) = self.generated_key.take() {
+            let key = PromptCacheKey::Explicit {
+                value: self.generated_cache_key(&generated),
+            };
+            self.prompt_cache = Some(if generated.required {
+                PromptCachePolicy::Required {
+                    key: Some(key),
+                    retention: generated.retention,
+                    breakpoint: CacheBreakpoint::Auto,
+                    vendor_extensions: VendorExtensions::new(),
+                }
+            } else {
+                PromptCachePolicy::BestEffort {
+                    key: Some(key),
+                    retention: generated.retention,
+                    breakpoint: CacheBreakpoint::Auto,
+                    vendor_extensions: VendorExtensions::new(),
+                }
+            });
+        }
+
+        let mut messages = self.stable_messages;
+        messages.extend(self.dynamic_messages);
+        let input = messages.iter().cloned().map(RequestItem::from).collect();
+
+        LlmRequest {
+            model: self.model,
+            instructions: self.instructions,
+            input,
+            messages,
+            capabilities: CapabilitySet {
+                tools: self.tools,
+                prompt_cache: self.prompt_cache,
+                ..Default::default()
+            },
+            generation: self.generation,
+            metadata: VendorExtensions::new(),
+            vendor_extensions: VendorExtensions::new(),
+        }
+    }
+
+    fn generated_cache_key(&self, generated: &GeneratedPromptCacheKey) -> String {
+        let fingerprint = serde_json::json!({
+            "model": self.model,
+            "instructions": self.instructions,
+            "tools": self.tools,
+            "stable_messages": self.stable_messages,
+        });
+        let hash = fnv1a64(fingerprint.to_string().as_bytes());
+        match &generated.tenant_scope {
+            Some(scope) => format!("{}:{}:{hash:016x}", generated.namespace, scope),
+            None => format!("{}:{hash:016x}", generated.namespace),
+        }
+    }
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    const OFFSET: u64 = 0xcbf29ce484222325;
+    const PRIME: u64 = 0x100000001b3;
+    let mut hash = OFFSET;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(PRIME);
+    }
+    hash
 }
 
 /// Provider-neutral streaming events.
@@ -634,4 +989,124 @@ pub enum LlmStreamEvent {
     Error {
         message: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prompt_cache_key(request: &LlmRequest) -> String {
+        let Some(PromptCachePolicy::BestEffort {
+            key: Some(PromptCacheKey::Explicit { value }),
+            ..
+        }) = request.capabilities.prompt_cache.as_ref()
+        else {
+            panic!("expected generated explicit best-effort prompt cache key");
+        };
+        value.clone()
+    }
+
+    #[test]
+    fn capability_set_empty_tracks_prompt_cache_policy() {
+        let mut capabilities = CapabilitySet::default();
+        assert!(capabilities.is_empty());
+
+        capabilities.prompt_cache = Some(PromptCachePolicy::best_effort());
+        assert!(!capabilities.is_empty());
+    }
+
+    #[test]
+    fn legacy_cache_settings_migrate_to_effective_prompt_cache() {
+        let disabled = CapabilitySet {
+            cache: Some(CacheSettings {
+                enabled: false,
+                vendor_extensions: VendorExtensions::new(),
+            }),
+            ..Default::default()
+        };
+        assert!(matches!(
+            disabled.effective_prompt_cache(),
+            Some(PromptCachePolicy::Disabled)
+        ));
+
+        let enabled = CapabilitySet {
+            cache: Some(CacheSettings {
+                enabled: true,
+                vendor_extensions: [("provider_hint".into(), Value::Bool(true))]
+                    .into_iter()
+                    .collect(),
+            }),
+            ..Default::default()
+        };
+        let Some(PromptCachePolicy::BestEffort {
+            vendor_extensions, ..
+        }) = enabled.effective_prompt_cache()
+        else {
+            panic!("expected legacy cache settings to become best-effort prompt cache");
+        };
+        assert_eq!(
+            vendor_extensions.get("provider_hint"),
+            Some(&Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn prompt_cache_policy_serde_round_trips() {
+        let policy = PromptCachePolicy::Required {
+            key: Some(PromptCacheKey::StablePrefixHash {
+                namespace: "docs".into(),
+                tenant_scope: Some("tenant-a".into()),
+            }),
+            retention: PromptCacheRetention::Long,
+            breakpoint: CacheBreakpoint::EndOfInstructions,
+            vendor_extensions: VendorExtensions::new(),
+        };
+
+        let raw = serde_json::to_string(&policy).expect("serialize policy");
+        let parsed: PromptCachePolicy = serde_json::from_str(&raw).expect("deserialize policy");
+        assert_eq!(parsed, policy);
+    }
+
+    #[test]
+    fn prompt_layout_builder_key_ignores_dynamic_suffix() {
+        let first = PromptLayoutBuilder::new("gpt-5.4")
+            .instructions("Use the policy document.")
+            .stable_message(Message::text(MessageRole::User, "Stable example"))
+            .user_input("Question one")
+            .stable_prefix_cache_key(
+                "policy",
+                Some("tenant-a"),
+                PromptCacheRetention::Long,
+                false,
+            )
+            .build();
+        let second = PromptLayoutBuilder::new("gpt-5.4")
+            .instructions("Use the policy document.")
+            .stable_message(Message::text(MessageRole::User, "Stable example"))
+            .user_input("Question two")
+            .stable_prefix_cache_key(
+                "policy",
+                Some("tenant-a"),
+                PromptCacheRetention::Long,
+                false,
+            )
+            .build();
+        let changed_stable = PromptLayoutBuilder::new("gpt-5.4")
+            .instructions("Use the updated policy document.")
+            .stable_message(Message::text(MessageRole::User, "Stable example"))
+            .user_input("Question one")
+            .stable_prefix_cache_key(
+                "policy",
+                Some("tenant-a"),
+                PromptCacheRetention::Long,
+                false,
+            )
+            .build();
+
+        assert_eq!(prompt_cache_key(&first), prompt_cache_key(&second));
+        assert_ne!(prompt_cache_key(&first), prompt_cache_key(&changed_stable));
+        assert_eq!(first.messages.len(), 2);
+        assert_eq!(first.messages[0].plain_text(), "Stable example");
+        assert_eq!(first.messages[1].plain_text(), "Question one");
+    }
 }

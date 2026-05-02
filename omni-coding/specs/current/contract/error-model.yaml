@@ -1,0 +1,156 @@
+id: contract.error.model
+kind: contract
+version: 1
+status: current
+summary: 错误类型、分类与跨层映射
+
+sources:
+  modules:
+    - src/error.rs
+    - src/protocol.rs
+    - src/api_protocol.rs
+    - src/dispatcher.rs
+    - src/gateway.rs
+
+types:
+  ProviderError:
+    protocol: ProviderProtocol
+    status: Option<u16>
+    code: Option<String>
+    message: String
+    retry_after: Option<Duration>
+    raw_body: Option<String>
+    vendor_extensions: BTreeMap<String, Value>
+  GatewayError:
+    variants:
+      - NoAvailableKey
+      - BudgetExceeded
+      - RateLimited
+      - Unauthorized
+      - Cancelled
+      - Provider
+      - Protocol
+      - Http
+  ApiError:
+    visibility: crate_private
+    variants:
+      - Unauthorized
+      - RateLimited
+      - Provider
+      - Protocol
+      - Cancelled
+  ProtocolError:
+    variants:
+      - Json
+      - MissingField
+      - InvalidShape
+      - UnsupportedFeature
+  ApiProtocolError:
+    variants:
+      - Json
+      - Generation
+      - EndpointMismatch
+      - UnsupportedWireFormat
+      - TransportRequired
+      - MissingField
+      - InvalidShape
+      - UnsupportedFeature
+
+dispatcher_classification:
+  http_401_403: ApiError::Unauthorized
+  http_429:
+    error: ApiError::RateLimited
+    retry_after_header: retry-after
+    retry_after_default_seconds: 60
+  other_http:
+    error: ApiError::Provider
+    parser: parse_error
+    fallback_provider_error:
+      protocol: endpoint_wire_protocol
+      status: response_status
+      code: null
+      message: raw_body
+      raw_body: null
+  network:
+    error: ApiError::Provider
+    provider_error:
+      status: null
+      code: network_error
+      message: reqwest_error_string
+  protocol_conversion:
+    error: ApiError::Protocol
+
+gateway_mapping:
+  ApiError::Unauthorized: GatewayError::Unauthorized
+  ApiError::RateLimited: GatewayError::RateLimited
+  ApiError::Cancelled: GatewayError::Cancelled
+  ApiError::Provider: GatewayError::Provider
+  ApiError::Protocol: GatewayError::Protocol
+
+key_state_drivers:
+  Unauthorized: mark_key_dead
+  RateLimited: update_rate_limit_cooldown
+  Provider: increment_circuit_breaker
+  Cancelled: no_key_state_change
+  Protocol: no_key_state_change
+
+provider_error_parsing:
+  OpenAiResponses:
+    code_fields:
+      - error.code
+      - error.type
+    message_field: error.message
+    raw_body: body_to_string
+  OpenAiChatCompletions:
+    code_fields:
+      - error.code
+      - error.type
+    message_field: error.message
+    raw_body: body_to_string
+  ClaudeMessages:
+    code_field: error.type
+    message_field: error.message
+    raw_body: body_to_string
+  GeminiGenerateContent:
+    status_field: error.code
+    code_field: error.status
+    message_field: error.message
+    raw_body: body_to_string
+
+constraints:
+  provider_error_is_serializable: true
+  gateway_error_is_public: true
+  api_error_is_internal: true
+  unauthorized_is_key_health_signal: true
+  rate_limited_is_key_cooldown_signal: true
+
+invariants:
+  - provider_errors_preserve_protocol
+  - gateway_maps_internal_api_errors_before_return
+  - http_429_uses_retry_after_or_default
+  - network_errors_are_provider_errors_with_no_status
+  - protocol_errors_do_not_trip_key_failure_state
+  - cancellation_does_not_trip_key_failure_state
+  - api_protocol_endpoint_mismatch_is_explicit
+  - transport_required_is_explicit
+
+semantics:
+  provider_errors_preserve_protocol: ProviderError.protocol 指明原始 wire protocol。
+  gateway_maps_internal_api_errors_before_return: Gateway 外部不暴露 ApiError。
+  http_429_uses_retry_after_or_default: retry-after 缺失或不可解析时使用 60 秒。
+  network_errors_are_provider_errors_with_no_status: reqwest 网络错误归一为 status=None 且 code=network_error。
+  protocol_errors_do_not_trip_key_failure_state: 本地转换错误不代表 key 失败。
+  cancellation_does_not_trip_key_failure_state: 上游取消不影响 key 健康。
+  api_protocol_endpoint_mismatch_is_explicit: 多端点 emit 时 endpoint 与 wire format 不匹配返回 EndpointMismatch。
+  transport_required_is_explicit: 需要 multipart 或 binary transport 的路径返回 TransportRequired。
+
+relations:
+  depends_on:
+    - contract.endpoint.protocol
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - capability.key_pool.balance
+    - contract.generation.transcoding
+    - contract.multi_endpoint.transcoding
+

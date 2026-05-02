@@ -1,0 +1,64 @@
+id: patch.prompt_cache.implementation
+kind: patch
+created: 2026-05-02
+status: applied
+summary: 同步 prompt cache implementation state 到 current Spec
+
+operations:
+  - op: update
+    target: contract.prompt_cache.policy
+    expected_version: 1
+    reason: 所有 prompt-cache task 已实现，需要把 current Snapshot 从 planned target 更新为 implemented support。
+    changes:
+      set:
+        summary: Provider-neutral prompt cache policy and telemetry support
+        implementation_state.typed_prompt_cache_policy: implemented
+        implementation_state.current_provider_wire_mapping.OpenAI: prompt_cache_key_and_retention
+        implementation_state.current_provider_wire_mapping.ClaudeMessages: cache_control_breakpoints
+        implementation_state.current_provider_wire_mapping.GeminiGenerateContent: unsupported
+        implementation_state.current_usage_telemetry_mapping.OpenAI: cached_input_tokens
+        implementation_state.current_usage_telemetry_mapping.ClaudeMessages: cache_read_and_creation_tokens
+        constraints.typed_support_currently_implemented: true
+      remove:
+        - constraints.typed_support_not_currently_implemented
+      validation:
+        - cargo fmt
+        - cargo test
+  - op: update
+    target: contract.generation.model
+    expected_version: 2
+    reason: `CapabilitySet.prompt_cache` 和公开 PromptCache 类型已落地，canonical model Snapshot 需要同步字段。
+    changes:
+      add:
+        capability_schema.CapabilitySet.prompt_cache: Option<PromptCachePolicy>
+        capability_schema.PromptCachePolicy: contract.prompt_cache.policy
+  - op: update
+    target: contract.generation.transcoding
+    expected_version: 2
+    reason: OpenAI/Claude typed mapping、usage parse、BestEffort/Required bridge 语义已实现。
+    changes:
+      set:
+        prompt_cache_support_state.typed_policy_mapping: implemented_by_contract.prompt_cache.policy
+        prompt_cache_support_state.current_openai_typed_emit: true
+        prompt_cache_support_state.current_claude_cache_control_emit: true
+        prompt_cache_support_state.current_prompt_cache_usage_parse: true
+  - op: update
+    target: capability.budget.cost
+    expected_version: 2
+    reason: `pricing::actual` 已接入 provider telemetry 和已知 cache rate 的 conservative actual accounting。
+    changes:
+      set:
+        prompt_cache_pricing_state.typed_cache_usage_accounting: implemented_by_contract.prompt_cache.policy
+        prompt_cache_pricing_state.current_actual_behavior: cache_aware_when_telemetry_and_rate_exist
+  - op: update
+    target: contract.public_api.surface
+    expected_version: 1
+    reason: crate root 已 reexport PromptCache public types 和 PromptLayoutBuilder。
+    changes:
+      add:
+        public_api.types.CacheBreakpoint: exported
+        public_api.types.PromptCacheKey: exported
+        public_api.types.PromptCachePolicy: exported
+        public_api.types.PromptCacheRetention: exported
+        public_api.types.PromptCacheUsage: exported
+        public_api.types.PromptLayoutBuilder: exported

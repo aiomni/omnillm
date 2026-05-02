@@ -1,0 +1,127 @@
+id: capability.key_pool.balance
+kind: capability
+version: 1
+status: current
+summary: 多 key 选择、限流、租约与熔断
+
+sources:
+  modules:
+    - src/key/inner.rs
+    - src/key/lease.rs
+    - src/key/pool.rs
+    - src/key/registry.rs
+    - src/key/mod.rs
+    - src/limiter/window.rs
+    - src/limiter/mod.rs
+
+input:
+  acquire:
+    estimated_tokens: u32
+  registry_acquire:
+    provider: string
+    model: string
+    estimated_tokens: u32
+  report_error:
+    lease: KeyLease
+    error: ApiError
+  report_success:
+    lease: KeyLease
+
+output:
+  acquire: Option<KeyLease>
+  registry_acquire: Option<KeyLease>
+  status: Vec<KeyStatus>
+
+state:
+  key:
+    key: String
+    label: String
+    state: AtomicU8
+    cool_down_until: AtomicU64
+    consecutive_failures: AtomicU32
+    failure_cool_down_until: AtomicU64
+    tpm_inflight: AtomicU32
+    tpm_limit: u32
+    rpm_window: SlidingWindow
+  states:
+    healthy: 0
+    dead: 1
+  registry_key: [provider_id, model_id]
+
+selection:
+  strategy: randomized_start_first_fit
+  max_cas_attempts_source: PoolConfig::max_cas_attempts
+  cas_operation: tpm_inflight_compare_exchange
+  cas_failure_action: skip_to_next_key
+  empty_pool_result: None
+
+rate_limiting:
+  tpm:
+    scope: per_key
+    check: tpm_inflight + estimated_tokens <= tpm_limit
+    release: KeyLease::drop_fetch_sub
+  rpm:
+    scope: per_key
+    algorithm: sliding_window
+    window_seconds: 60
+    lock: parking_lot::Mutex<VecDeque<Instant>>
+
+error_state_transitions:
+  ApiError::Unauthorized:
+    state: dead
+  ApiError::RateLimited:
+    cool_down_until: now_millis + retry_after
+    circuit_breaker_increment: false
+  ApiError::Provider:
+    consecutive_failures: increment
+    threshold_source: PoolConfig::circuit_breaker_threshold
+    threshold_action:
+      failure_cool_down_until: now_millis + circuit_breaker_cooldown
+      consecutive_failures: 0
+  ApiError::Cancelled:
+    key_state: unchanged
+  ApiError::Protocol:
+    key_state: unchanged
+  success:
+    consecutive_failures: 0
+
+availability:
+  dead_key_available: false
+  active_rate_limit_cooldown_available: false
+  active_failure_cooldown_available: false
+  expired_cooldowns: lazily_cleared
+
+constraints:
+  rate_limit_cooldown_separate_from_circuit_breaker: true
+  pool_registry_scope: provider_model
+  tpm_reservation_guard: KeyLease
+  key_secret_public_access: false
+
+invariants:
+  - tpm_inflight_never_exceeds_tpm_limit_on_successful_acquire
+  - key_lease_drop_always_returns_reserved_tokens
+  - unauthorized_key_is_permanently_dead
+  - rate_limit_error_does_not_increment_circuit_breaker
+  - provider_error_threshold_trips_failure_cooldown
+  - success_resets_consecutive_failures
+  - rpm_window_has_no_cross_key_contention
+  - provider_model_pools_are_independent
+
+semantics:
+  tpm_inflight_never_exceeds_tpm_limit_on_successful_acquire: acquire 只有 CAS 成功且未超过 TPM limit 才返回 KeyLease。
+  key_lease_drop_always_returns_reserved_tokens: Drop 对 tpm_inflight 执行 fetch_sub(reserved_tokens)。
+  unauthorized_key_is_permanently_dead: 401 或 403 使 key 不再参与选择。
+  rate_limit_error_does_not_increment_circuit_breaker: 429 只更新 cool_down_until。
+  provider_error_threshold_trips_failure_cooldown: provider/network/5xx 类失败按阈值进入 failure_cool_down_until。
+  success_resets_consecutive_failures: 成功响应将连续失败计数清零。
+  rpm_window_has_no_cross_key_contention: 每个 key 独立持有 SlidingWindow Mutex。
+  provider_model_pools_are_independent: PoolRegistry 以 provider 和 model 二元组隔离 KeyPool。
+
+relations:
+  depends_on:
+    - contract.gateway.config
+    - contract.error.model
+  extends: []
+  constrains:
+    - capability.gateway.execute
+
