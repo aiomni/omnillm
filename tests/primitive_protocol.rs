@@ -318,6 +318,56 @@ async fn unsupported_primitive_request_fails_before_budget_or_network() {
 }
 
 #[tokio::test]
+async fn primitive_anthropic_p1_models_and_files_keep_headers_and_zero_budget() {
+    let registry = embedded_primitive_provider_registry();
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::Anthropic,
+        ProviderPrimitiveWireFormat::AnthropicModels,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::Anthropic,
+        ProviderPrimitiveWireFormat::AnthropicFiles,
+        PrimitiveStreamMode::None,
+    ));
+
+    let models = PrimitiveRequest::get(
+        PrimitiveProviderKind::Anthropic,
+        PrimitiveEndpointKind::Models,
+        ProviderPrimitiveWireFormat::AnthropicModels,
+        Option::<String>::None,
+    );
+    assert_eq!(
+        models.budget_class(),
+        PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost
+    );
+    let (response, raw_request, used_usd) =
+        call_and_capture_anthropic(models, json!({"data":[]})).await;
+    assert_eq!(response.status, 200);
+    assert!(raw_request.starts_with("GET /models HTTP/1.1"));
+    let lower = raw_request.to_ascii_lowercase();
+    assert!(lower.contains("x-api-key: sk-test"));
+    assert!(lower.contains("anthropic-version: 2023-06-01"));
+    assert_eq!(used_usd, 0.0);
+
+    let file_get = PrimitiveRequest::get(
+        PrimitiveProviderKind::Anthropic,
+        PrimitiveEndpointKind::Files,
+        ProviderPrimitiveWireFormat::AnthropicFiles,
+        Option::<String>::None,
+    )
+    .with_path("/files/file_1");
+    assert_eq!(
+        file_get.budget_class(),
+        PrimitiveBudgetClass::UploadOrStorage
+    );
+    let (_, raw_request, used_usd) =
+        call_and_capture_anthropic(file_get, json!({"id":"file_1"})).await;
+    assert!(raw_request.starts_with("GET /files/file_1 HTTP/1.1"));
+    assert_eq!(used_usd, 0.0);
+}
+
+#[tokio::test]
 async fn primitive_call_extracts_anthropic_gemini_and_compatible_usage() {
     let anthropic = call_once(
         PrimitiveProviderEndpoint::new(PrimitiveProviderKind::Anthropic, "http://127.0.0.1:0"),
@@ -636,6 +686,29 @@ async fn primitive_realtime_is_explicit_scaffold() {
         .await
         .expect_err("realtime is scaffolded");
     assert!(matches!(err, GatewayError::Protocol(_)));
+}
+
+async fn call_and_capture_anthropic(
+    request: PrimitiveRequest,
+    provider_response: serde_json::Value,
+) -> (omnillm::PrimitiveResponse, String, f64) {
+    let (base_url, server) = spawn_server(
+        200,
+        Some("application/json"),
+        provider_response.to_string().into_bytes(),
+    )
+    .await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::Anthropic,
+        base_url,
+    ));
+    let response = gateway
+        .primitive_call(request, CancellationToken::new())
+        .await
+        .expect("primitive call succeeds");
+    let used_usd = gateway.budget_used_usd();
+    let raw_request = server.await.expect("server joins").expect("server ok");
+    (response, raw_request, used_usd)
 }
 
 async fn call_and_capture_openai(

@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-003
 title: Implement P1 Anthropic metadata and files gaps
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, anthropic, http]
 project: primitive-provider-scope-expansion
@@ -22,11 +22,11 @@ Anthropic primitive support covers Messages, Count Tokens, Message Batches, and 
 - Classify Models as zero-cost metadata and Files as upload/storage or zero-cost metadata by operation.
 
 # Execution Steps
-- [ ] Add Anthropic Models registry/path coverage.
-- [ ] Audit Anthropic Files create/get/list/delete/download path coverage and mark unsupported operations explicitly.
-- [ ] Add auth/default header tests for `x-api-key` and `anthropic-version` behavior.
-- [ ] Add payload preservation tests for file upload and file metadata responses.
-- [ ] Add budget tests for zero-cost metadata and upload/storage behavior.
+- [x] Add Anthropic Models registry/path coverage.
+- [x] Audit Anthropic Files create/get/list/delete/download path coverage and mark unsupported operations explicitly.
+- [x] Add auth/default header tests for `x-api-key` and `anthropic-version` behavior.
+- [x] Add payload preservation tests for file upload and file metadata responses.
+- [x] Add budget tests for zero-cost metadata and upload/storage behavior.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -45,10 +45,15 @@ Anthropic primitive support covers Messages, Count Tokens, Message Batches, and 
 - Recommended action: keep beta-only operations Planned unless tests include required headers.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Added Anthropic Models primitive wire format, registry support, and default path.
+- Added Anthropic Files explicit path hardening with auth/default header assertions.
+- Validation: `cargo fmt` and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; Anthropic Models/Files hardening acceptance criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source spec tier: `support_tiers.p1_low_risk_http_gaps.Anthropic`.

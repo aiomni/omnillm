@@ -86,6 +86,7 @@ pub enum ProviderPrimitiveWireFormat {
     AnthropicCountTokens,
     AnthropicMessageBatches,
     AnthropicFiles,
+    AnthropicModels,
     GeminiGenerateContent,
     GeminiStreamGenerateContent,
     GeminiCountTokens,
@@ -651,6 +652,12 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         &[ProviderPrimitiveWireFormat::AnthropicFiles],
                         &[PrimitiveStreamMode::None],
                     ),
+                    support(
+                        PrimitiveEndpointKind::Models,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::AnthropicModels],
+                        &[PrimitiveStreamMode::None],
+                    ),
                 ],
             },
             PrimitiveProviderDescriptor {
@@ -1030,6 +1037,7 @@ fn default_path(request: &PrimitiveRequest) -> Option<String> {
         ProviderPrimitiveWireFormat::AnthropicCountTokens => Some("/messages/count_tokens".into()),
         ProviderPrimitiveWireFormat::AnthropicMessageBatches => Some("/messages/batches".into()),
         ProviderPrimitiveWireFormat::AnthropicFiles => Some("/files".into()),
+        ProviderPrimitiveWireFormat::AnthropicModels => Some("/models".into()),
         ProviderPrimitiveWireFormat::GeminiGenerateContent => {
             model_path(request, "generateContent")
         }

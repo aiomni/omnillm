@@ -110,6 +110,7 @@ primitive_types:
       - AnthropicCountTokens
       - AnthropicMessageBatches
       - AnthropicFiles
+      - AnthropicModels
       - GeminiGenerateContent
       - GeminiStreamGenerateContent
       - GeminiCountTokens
