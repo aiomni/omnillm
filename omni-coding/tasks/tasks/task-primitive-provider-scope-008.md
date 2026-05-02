@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-008
 title: Implement binary chunk streaming transport
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, streaming, binary]
 project: primitive-provider-scope-expansion
@@ -24,11 +24,11 @@ Binary chunk streaming is needed for provider-native media streams such as OpenA
 - Settle budget once on EOF, provider error, or cancellation.
 
 # Execution Steps
-- [ ] Add dispatcher support for binary response byte streams.
-- [ ] Emit `PrimitiveStreamEvent::BinaryChunk` with media type metadata where available.
-- [ ] Add cancellation, EOF, provider error, and partial usage/billable-unit fallback tests.
-- [ ] Add OpenAI Audio Speech binary chunk fixture.
-- [ ] Update docs to distinguish full binary response from binary chunk streaming.
+- [x] Add dispatcher support for binary response byte streams.
+- [x] Emit `PrimitiveStreamEvent::BinaryChunk` with media type metadata where available.
+- [x] Add cancellation, EOF, provider error, and partial usage/billable-unit fallback tests.
+- [x] Add OpenAI Audio Speech binary chunk fixture.
+- [x] Update docs to distinguish full binary response from binary chunk streaming.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -47,10 +47,15 @@ Binary chunk streaming is needed for provider-native media streams such as OpenA
 - Recommended action: keep provider-specific media billing as billable-unit telemetry when available.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Implemented `PrimitiveStreamMode::BinaryChunks` in gateway and dispatcher.
+- Added OpenAI Audio Speech binary chunk fixture preserving bytes and media type while settling budget.
+- Validation: `cargo fmt` and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; binary chunk streaming transport acceptance criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source spec tier: `support_tiers.p3_transport_expansion.OpenAi.AudioSpeechBinaryChunks`.

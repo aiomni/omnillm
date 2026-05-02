@@ -15,6 +15,7 @@ sources:
 implementation_state:
   primitive_call: implemented
   primitive_stream_sse: implemented
+  primitive_stream_binary_chunks: implemented
   primitive_realtime: scaffolded_explicit_protocol_error
   primitive_async_job: lifecycle_boundary_defined
   shared_key_pool: implemented
@@ -28,6 +29,9 @@ input:
   primitive_stream:
     request: PrimitiveRequest
     cancel: CancellationToken
+    supported_modes:
+      - Sse
+      - BinaryChunks
   primitive_realtime:
     request: PrimitiveRequest
     cancel: CancellationToken

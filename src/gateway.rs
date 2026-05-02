@@ -325,9 +325,12 @@ impl Gateway {
         cancel: CancellationToken,
     ) -> Result<PrimitiveGatewayStream, GatewayError> {
         self.ensure_primitive_supported(&req)?;
-        if req.stream != PrimitiveStreamMode::Sse {
+        if !matches!(
+            req.stream,
+            PrimitiveStreamMode::Sse | PrimitiveStreamMode::BinaryChunks
+        ) {
             return Err(GatewayError::Protocol(
-                "primitive_stream currently supports SSE stream mode only".into(),
+                "primitive_stream currently supports SSE and binary chunk stream modes only".into(),
             ));
         }
 

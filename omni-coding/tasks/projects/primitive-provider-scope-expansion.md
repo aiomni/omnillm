@@ -27,7 +27,7 @@
 - Done: P1 docs/examples/support matrix sync.
 - Done: P2 primitive async job lifecycle design and runtime shape.
 - Done: P2 cross-provider batch lifecycle implementation.
-- Todo: P3 binary chunk streaming transport.
+- Done: P3 binary chunk streaming transport.
 - Todo: P3 realtime session transport.
 - Todo: final docs, validation, and support claim audit.
 

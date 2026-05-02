@@ -167,9 +167,12 @@ impl Dispatcher {
         lease: &KeyLease,
         req: &PrimitiveRequest,
     ) -> Result<PrimitiveEventStream, ApiError> {
-        if req.stream != PrimitiveStreamMode::Sse {
+        if !matches!(
+            req.stream,
+            PrimitiveStreamMode::Sse | PrimitiveStreamMode::BinaryChunks
+        ) {
             return Err(ApiError::Protocol(
-                "primitive_stream currently supports SSE stream mode only".into(),
+                "primitive_stream currently supports SSE and binary chunk stream modes only".into(),
             ));
         }
 
@@ -177,9 +180,11 @@ impl Dispatcher {
             .primitive_endpoint
             .request_url(req)
             .map_err(ApiError::Protocol)?;
-        let response = self
-            .primitive_request_builder(req, &url, &lease.inner.key)?
-            .header("Accept", "text/event-stream")
+        let mut builder = self.primitive_request_builder(req, &url, &lease.inner.key)?;
+        if req.stream == PrimitiveStreamMode::Sse {
+            builder = builder.header("Accept", "text/event-stream");
+        }
+        let response = builder
             .send()
             .await
             .map_err(|error| primitive_network_to_api(req, error))?;
@@ -187,6 +192,27 @@ impl Dispatcher {
         let status = response.status();
         if !status.is_success() {
             return Err(self.classify_primitive_error(req, status, response).await);
+        }
+
+        if req.stream == PrimitiveStreamMode::BinaryChunks {
+            let media_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+            let request_for_errors = req.clone();
+            let stream = try_stream! {
+                let mut body_stream = response.bytes_stream();
+                while let Some(chunk) = body_stream.next().await {
+                    let chunk = chunk.map_err(|error| primitive_network_to_api(&request_for_errors, error))?;
+                    yield PrimitiveStreamEvent::BinaryChunk {
+                        data_base64: BASE64_STANDARD.encode(&chunk),
+                        media_type: media_type.clone(),
+                    };
+                }
+                yield PrimitiveStreamEvent::Completed { usage: None };
+            };
+            return Ok(Box::pin(stream));
         }
 
         let wire_format = req.wire_format;

@@ -733,6 +733,49 @@ async fn primitive_audio_speech_preserves_binary_response_with_budget_fallback()
 }
 
 #[tokio::test]
+async fn primitive_binary_chunk_stream_preserves_audio_bytes_and_settles_budget() {
+    let (base_url, server) = spawn_server(200, Some("audio/mpeg"), vec![0, 159, 146, 150]).await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::AudioSpeech,
+        ProviderPrimitiveWireFormat::OpenAiAudioSpeech,
+        "gpt-4o-mini-tts",
+        json!({"model":"gpt-4o-mini-tts","input":"hello","voice":"alloy"}),
+    )
+    .with_stream(PrimitiveStreamMode::BinaryChunks);
+
+    let mut stream = gateway
+        .primitive_stream(request, CancellationToken::new())
+        .await
+        .expect("binary primitive stream starts");
+    let mut chunks = Vec::new();
+    let mut completed = false;
+    while let Some(event) = stream.next().await {
+        match event.expect("stream item") {
+            PrimitiveStreamEvent::BinaryChunk {
+                data_base64,
+                media_type,
+            } => {
+                chunks.push(data_base64);
+                assert_eq!(media_type.as_deref(), Some("audio/mpeg"));
+            }
+            PrimitiveStreamEvent::Completed { .. } => completed = true,
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
+
+    assert_eq!(chunks, vec!["AJ+Slg=="]);
+    assert!(completed);
+    assert!(gateway.budget_used_usd() > 0.0);
+    let raw_request = server.await.expect("server joins").expect("server ok");
+    assert!(raw_request.starts_with("POST /audio/speech HTTP/1.1"));
+}
+
+#[tokio::test]
 async fn primitive_sse_stream_preserves_frames_and_settles_usage() {
     let body = concat!(
         "event: response.output_text.delta\n",

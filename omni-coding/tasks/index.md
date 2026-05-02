@@ -16,7 +16,6 @@ Plans:
 - No active tasks.
 
 ## Todo
-- `task-primitive-provider-scope-008`: Implement binary chunk streaming transport
 - `task-primitive-provider-scope-009`: Implement realtime session transports
 - `task-primitive-provider-scope-010`: Finalize primitive expansion docs validation and support claims
 
@@ -24,6 +23,7 @@ Plans:
 - No blocked tasks.
 
 ## Done
+- `task-primitive-provider-scope-008`: Implement binary chunk streaming transport
 - `task-primitive-provider-scope-007`: Implement P2 batch lifecycle providers
 - `task-primitive-provider-scope-006`: Define primitive async job lifecycle
 - `task-primitive-provider-scope-005`: Sync P1 primitive support docs and examples
