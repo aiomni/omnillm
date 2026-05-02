@@ -1,6 +1,6 @@
 id: capability.primitive_provider.execute
 kind: capability
-version: 2
+version: 3
 status: current
 summary: Provider primitive protocol 的非转换执行能力
 
@@ -16,7 +16,7 @@ implementation_state:
   primitive_call: implemented
   primitive_stream_sse: implemented
   primitive_stream_binary_chunks: implemented
-  primitive_realtime: scaffolded_explicit_protocol_error
+  primitive_realtime: websocket_implemented_webrtc_planned
   primitive_async_job: lifecycle_boundary_defined
   shared_key_pool: implemented
   shared_budget_tracker: implemented
@@ -35,6 +35,10 @@ input:
   primitive_realtime:
     request: PrimitiveRequest
     cancel: CancellationToken
+    implemented_modes:
+      - WebSocket
+    planned_modes:
+      - WebRtc
   primitive_async_job:
     request: PrimitiveAsyncJobRequest
     cancel: CancellationToken
@@ -121,7 +125,7 @@ pipeline:
       cost: pricing_from_elapsed_partial_usage_or_estimate
       key_state: report_success
     cancellation:
-      cost: pricing_from_accumulated_usage_or_partial_usage
+      cost: pricing_from_accumulated_usage_or_full_refund_when_unobserved
       key_state: unchanged
 
 budget:
@@ -138,6 +142,11 @@ streaming:
     - WebSocket
     - WebRtc
     - BinaryChunks
+  realtime_modes:
+    implemented:
+      - WebSocket
+    planned:
+      - WebRtc
   frame_preservation: provider_native_frame_is_returned_before_optional_usage_event
   usage_events: side_channel_events_do_not_replace_provider_frames
   done_detection:

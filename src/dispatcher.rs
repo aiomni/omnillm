@@ -5,15 +5,16 @@ use std::time::Duration;
 
 use async_stream::try_stream;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
-use futures_util::{Stream, StreamExt};
+use futures_util::{SinkExt, Stream, StreamExt};
 use reqwest::{Client, Method, StatusCode};
+use tokio_tungstenite::tungstenite::{client::IntoClientRequest, http, Message};
 
 use crate::api::{HttpMethod, MultipartValue, RequestBody, ResponseBody};
 use crate::error::{ApiError, ProviderError};
 use crate::key::lease::KeyLease;
 use crate::primitive::{
-    extract_usage, primitive_error_from_body, PrimitiveProviderEndpoint, PrimitiveRequest,
-    PrimitiveResponse, PrimitiveStreamEvent, PrimitiveStreamMode,
+    extract_usage, primitive_error_from_body, PrimitiveProviderEndpoint, PrimitiveRealtimeSession,
+    PrimitiveRequest, PrimitiveResponse, PrimitiveStreamEvent, PrimitiveStreamMode,
 };
 use crate::protocol::{
     emit_request_with_mode, parse_error, parse_response, parse_stream_events, take_sse_frames,
@@ -28,6 +29,7 @@ pub(crate) type PrimitiveEventStream =
 /// Stateless HTTP executor.
 pub(crate) struct Dispatcher {
     client: Client,
+    timeout: Duration,
     provider_endpoint: ProviderEndpoint,
     primitive_endpoint: PrimitiveProviderEndpoint,
 }
@@ -48,6 +50,7 @@ impl Dispatcher {
                 .timeout(timeout)
                 .build()
                 .expect("failed to build reqwest client"),
+            timeout,
             provider_endpoint,
             primitive_endpoint,
         }
@@ -262,6 +265,108 @@ impl Dispatcher {
         Ok(Box::pin(stream))
     }
 
+    pub(crate) async fn primitive_realtime(
+        &self,
+        lease: &KeyLease,
+        req: &PrimitiveRequest,
+    ) -> Result<PrimitiveRealtimeSession, ApiError> {
+        if req.stream != PrimitiveStreamMode::WebSocket {
+            return Err(ApiError::Protocol(
+                "primitive realtime currently supports WebSocket transport only".into(),
+            ));
+        }
+
+        let url = self
+            .primitive_endpoint
+            .request_url(req)
+            .map_err(ApiError::Protocol)?;
+        let auth = self.primitive_endpoint.auth_scheme();
+        let url = websocket_url(&url, req, &auth, &lease.inner.key)?;
+        let mut request = url
+            .as_str()
+            .into_client_request()
+            .map_err(|error| ApiError::Protocol(error.to_string()))?;
+
+        insert_websocket_headers(
+            request.headers_mut(),
+            &self.primitive_endpoint.default_headers,
+        )?;
+        insert_websocket_headers(request.headers_mut(), &req.headers)?;
+        insert_websocket_auth(request.headers_mut(), &auth, &lease.inner.key)?;
+
+        let (mut socket, _) =
+            tokio::time::timeout(self.timeout, tokio_tungstenite::connect_async(request))
+                .await
+                .map_err(|_| {
+                    ApiError::Protocol("primitive realtime WebSocket open timed out".into())
+                })?
+                .map_err(|error| primitive_websocket_to_api(req, error))?;
+
+        send_initial_realtime_payload(&mut socket, req).await?;
+
+        let mut events = Vec::new();
+        let mut usage = None;
+        loop {
+            let message = tokio::time::timeout(self.timeout, socket.next())
+                .await
+                .map_err(|_| {
+                    ApiError::Protocol("primitive realtime WebSocket receive timed out".into())
+                })?;
+            let Some(message) = message else {
+                break;
+            };
+            let message = message.map_err(|error| primitive_websocket_to_api(req, error))?;
+            match message {
+                Message::Text(text) => {
+                    let text = text.to_string();
+                    let event = PrimitiveStreamEvent::WebSocketMessage {
+                        text: Some(text.clone()),
+                        data_base64: None,
+                    };
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                        let body = ResponseBody::Json { value };
+                        if let Some(found_usage) = extract_usage(req.wire_format, &body) {
+                            usage = Some(found_usage.clone());
+                            events.push(event);
+                            events.push(PrimitiveStreamEvent::Usage { usage: found_usage });
+                            continue;
+                        }
+                    }
+                    events.push(event);
+                }
+                Message::Binary(data) => {
+                    events.push(PrimitiveStreamEvent::WebSocketMessage {
+                        text: None,
+                        data_base64: Some(BASE64_STANDARD.encode(&data)),
+                    });
+                }
+                Message::Close(_) => break,
+                Message::Ping(data) => {
+                    socket
+                        .send(Message::Pong(data))
+                        .await
+                        .map_err(|error| primitive_websocket_to_api(req, error))?;
+                }
+                Message::Pong(_) | Message::Frame(_) => {}
+            }
+        }
+
+        let _ = socket.close(None).await;
+        events.push(PrimitiveStreamEvent::Completed {
+            usage: usage.clone(),
+        });
+
+        Ok(PrimitiveRealtimeSession {
+            provider: req.provider,
+            endpoint: req.endpoint,
+            wire_format: req.wire_format,
+            stream_mode: req.stream,
+            events,
+            usage,
+            metadata: Default::default(),
+        })
+    }
+
     pub(crate) fn protocol(&self) -> ProviderProtocol {
         self.provider_endpoint.wire_protocol()
     }
@@ -450,6 +555,116 @@ impl Dispatcher {
             )),
         }
     }
+}
+
+async fn send_initial_realtime_payload<S>(
+    socket: &mut tokio_tungstenite::WebSocketStream<S>,
+    req: &PrimitiveRequest,
+) -> Result<(), ApiError>
+where
+    tokio_tungstenite::WebSocketStream<S>:
+        futures_util::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
+{
+    match &req.body {
+        RequestBody::Json { value } => socket
+            .send(Message::Text(value.to_string().into()))
+            .await
+            .map_err(|error| primitive_websocket_to_api(req, error)),
+        RequestBody::Text { text } if !text.is_empty() => socket
+            .send(Message::Text(text.clone().into()))
+            .await
+            .map_err(|error| primitive_websocket_to_api(req, error)),
+        RequestBody::Binary { data_base64, .. } => {
+            let bytes = BASE64_STANDARD
+                .decode(data_base64)
+                .map_err(|error| ApiError::Protocol(error.to_string()))?;
+            socket
+                .send(Message::Binary(bytes.into()))
+                .await
+                .map_err(|error| primitive_websocket_to_api(req, error))
+        }
+        RequestBody::Multipart { .. } => Err(ApiError::Protocol(
+            "primitive realtime does not support multipart initial payloads".into(),
+        )),
+        RequestBody::Text { .. } => Ok(()),
+    }
+}
+
+fn insert_websocket_headers(
+    headers: &mut http::HeaderMap,
+    values: &std::collections::BTreeMap<String, String>,
+) -> Result<(), ApiError> {
+    for (name, value) in values {
+        let name = http::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|error| ApiError::Protocol(error.to_string()))?;
+        let value = http::HeaderValue::from_str(value)
+            .map_err(|error| ApiError::Protocol(error.to_string()))?;
+        headers.insert(name, value);
+    }
+    Ok(())
+}
+
+fn insert_websocket_auth(
+    headers: &mut http::HeaderMap,
+    auth: &AuthScheme,
+    api_key: &str,
+) -> Result<(), ApiError> {
+    match auth {
+        AuthScheme::Bearer => {
+            let value = http::HeaderValue::from_str(&format!("Bearer {api_key}"))
+                .map_err(|error| ApiError::Protocol(error.to_string()))?;
+            headers.insert(http::header::AUTHORIZATION, value);
+        }
+        AuthScheme::Header { name } => {
+            let name = http::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|error| ApiError::Protocol(error.to_string()))?;
+            let value = http::HeaderValue::from_str(api_key)
+                .map_err(|error| ApiError::Protocol(error.to_string()))?;
+            headers.insert(name, value);
+        }
+        AuthScheme::Query { .. } => {}
+    }
+    Ok(())
+}
+
+fn websocket_url(
+    url: &str,
+    request: &PrimitiveRequest,
+    auth: &AuthScheme,
+    api_key: &str,
+) -> Result<String, ApiError> {
+    let url = if let Some(rest) = url.strip_prefix("http://") {
+        format!("ws://{rest}")
+    } else if let Some(rest) = url.strip_prefix("https://") {
+        format!("wss://{rest}")
+    } else {
+        url.to_string()
+    };
+    let mut parsed =
+        reqwest::Url::parse(&url).map_err(|error| ApiError::Protocol(error.to_string()))?;
+    if !request.query.is_empty() || matches!(auth, AuthScheme::Query { .. }) {
+        let mut pairs = parsed.query_pairs_mut();
+        for (name, value) in &request.query {
+            pairs.append_pair(name, value);
+        }
+        if let AuthScheme::Query { name } = auth {
+            pairs.append_pair(name, api_key);
+        }
+    }
+    Ok(parsed.to_string())
+}
+
+fn primitive_websocket_to_api(
+    req: &PrimitiveRequest,
+    error: tokio_tungstenite::tungstenite::Error,
+) -> ApiError {
+    ApiError::PrimitiveProvider(primitive_error_from_body(
+        req.provider,
+        req.wire_format,
+        None,
+        None,
+        error.to_string(),
+    ))
 }
 
 fn method(method: HttpMethod) -> Method {

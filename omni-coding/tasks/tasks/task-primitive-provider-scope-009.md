@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-009
 title: Implement realtime session transports
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, realtime, websocket]
 project: primitive-provider-scope-expansion
@@ -23,11 +23,11 @@ OpenAI Realtime and Gemini Live require session lifecycle transports and should 
 - Keep realtime support separate from ordinary HTTP primitive calls.
 
 # Execution Steps
-- [ ] Define or refine realtime session runtime API based on existing `PrimitiveRealtimeSession` scaffold.
-- [ ] Implement OpenAI Realtime WebSocket session tests with provider-native messages.
-- [ ] Implement Gemini Live WebSocket session tests with provider-native messages.
-- [ ] Define WebRTC support level as Planned or implement feature-gated tests if in scope.
-- [ ] Add close, provider error, cancellation, accumulated usage, and no-usage fallback settlement tests.
+- [x] Define or refine realtime session runtime API based on existing `PrimitiveRealtimeSession` scaffold.
+- [x] Implement OpenAI Realtime WebSocket session tests with provider-native messages.
+- [x] Implement Gemini Live WebSocket session tests with provider-native messages.
+- [x] Define WebRTC support level as Planned or implement feature-gated tests if in scope.
+- [x] Add close, provider error, cancellation, accumulated usage, and no-usage fallback settlement tests.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -46,10 +46,16 @@ OpenAI Realtime and Gemini Live require session lifecycle transports and should 
 - Recommended action: implement WebSocket first and keep WebRTC Planned unless tests are reliable.
 
 # Execution Log
-- Not started.
+- Implemented `PrimitiveRealtimeSession` event, usage, and metadata fields for completed session capture.
+- Added dispatcher WebSocket transport with auth/header/query injection, initial JSON/text/binary send, provider-native message preservation, usage side-channel events, close handling, and request-timeout guarded open/receive operations.
+- Added gateway budget/key/RPM integration for realtime sessions with once-only settlement on success, provider open error, local protocol error, and cancellation.
+- Added OpenAI Realtime and Gemini Live local WebSocket tests for native messages, usage extraction, budget settlement, no-usage fallback, provider handshake error refund, cancellation refund, and WebRTC planned protocol error.
+- Validation: `cargo test primitive --tests` passed.
 
 # Review
-- Review status: pending.
+- Review status: done.
+- Task can be marked done: WebSocket support is test-backed for OpenAI Realtime and Gemini Live, while WebRTC remains an explicit planned/protocol-error path.
+- Adjustment recorded: realtime API returns a completed session transcript rather than a long-lived interactive handle in this slice; richer incremental send/receive handles can be a future promoted task.
 
 # Notes
 - Source spec tier: `support_tiers.p3_transport_expansion`.

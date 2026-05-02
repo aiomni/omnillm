@@ -1,6 +1,6 @@
 id: contract.primitive_provider.scope
 kind: contract
-version: 1
+version: 2
 status: current
 summary: Provider primitive API scope and expansion boundary
 
@@ -140,7 +140,7 @@ support_tiers:
       OpenAi:
         - AudioSpeechBinaryChunks
         - RealtimeWebSocket
-        - RealtimeWebRtc
+        - RealtimeWebRtcPlanned
       Gemini:
         - LiveWebSocket
       Anthropic:
@@ -181,8 +181,9 @@ transport_boundaries:
       - BinaryChunks
     budget_settlement: final_usage_billable_units_or_reserved_estimate
   realtime_session:
-    allowed_modes:
+    implemented_modes:
       - WebSocket
+    planned_modes:
       - WebRtc
     budget_settlement: session_close_cancel_or_accumulated_usage
   async_job:

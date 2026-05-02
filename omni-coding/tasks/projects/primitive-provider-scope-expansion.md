@@ -28,14 +28,14 @@
 - Done: P2 primitive async job lifecycle design and runtime shape.
 - Done: P2 cross-provider batch lifecycle implementation.
 - Done: P3 binary chunk streaming transport.
-- Todo: P3 realtime session transport.
+- Done: P3 realtime session WebSocket transport for OpenAI Realtime and Gemini Live; WebRTC remains planned.
 - Todo: final docs, validation, and support claim audit.
 
 ## Milestones
 - Milestone 1: Scope guardrails — done (`task-primitive-provider-scope-001`).
 - Milestone 2: P1 HTTP gaps — done (`task-primitive-provider-scope-002` through `005`).
 - Milestone 3: P2 async jobs — done (`task-primitive-provider-scope-006`, `007`).
-- Milestone 4: P3 transports — tasks 008 and 009.
+- Milestone 4: P3 transports — done (`task-primitive-provider-scope-008`, `009`).
 - Milestone 5: final support claim audit — task 010.
 
 ## Acceptance Signals

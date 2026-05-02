@@ -378,6 +378,12 @@ pub struct PrimitiveRealtimeSession {
     pub endpoint: PrimitiveEndpointKind,
     pub wire_format: ProviderPrimitiveWireFormat,
     pub stream_mode: PrimitiveStreamMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<PrimitiveStreamEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<PrimitiveUsageTelemetry>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: VendorExtensions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -947,9 +953,15 @@ pub(crate) fn extract_usage(
         ProviderPrimitiveWireFormat::OpenAiResponses
         | ProviderPrimitiveWireFormat::OpenAiChatCompletions
         | ProviderPrimitiveWireFormat::OpenAiCompatibleChatCompletions => value.get("usage"),
+        ProviderPrimitiveWireFormat::OpenAiRealtime => value
+            .get("usage")
+            .or_else(|| value.pointer("/response/usage")),
         ProviderPrimitiveWireFormat::AnthropicMessages => value.get("usage"),
         ProviderPrimitiveWireFormat::GeminiGenerateContent
-        | ProviderPrimitiveWireFormat::GeminiStreamGenerateContent => value.get("usageMetadata"),
+        | ProviderPrimitiveWireFormat::GeminiStreamGenerateContent
+        | ProviderPrimitiveWireFormat::GeminiLive => value
+            .get("usageMetadata")
+            .or_else(|| value.pointer("/serverContent/usageMetadata")),
         _ => value.get("usage"),
     }?;
 

@@ -1,6 +1,6 @@
 id: contract.provider.primitive_protocol
 kind: contract
-version: 3
+version: 4
 status: current
 summary: OpenAI Responses 标准协议与 provider primitive 协议并行
 
@@ -24,14 +24,14 @@ implementation_state:
   primitive_registry: implemented
   primitive_call: implemented
   primitive_sse_stream: implemented
-  primitive_realtime: scaffolded_explicit_protocol_error
+  primitive_realtime: openai_and_gemini_websocket_implemented_webrtc_planned
   provider_family_slices:
-    OpenAi: implemented_non_stream_and_sse_scaffold
-    Anthropic: implemented_non_stream_and_sse_scaffold
-    Gemini: implemented_non_stream_and_sse_scaffold
+    OpenAi: implemented_non_stream_sse_binary_and_realtime_websocket
+    Anthropic: implemented_non_stream_and_sse
+    Gemini: implemented_non_stream_sse_and_live_websocket
     VertexAi: compatible_registry_only
     Bedrock: planned_registry_only
-    OpenAiCompatible: implemented_non_stream_and_sse_scaffold
+    OpenAiCompatible: implemented_non_stream_and_sse
 
 scope_policy:
   expansion_boundary: contract.primitive_provider.scope
@@ -165,6 +165,14 @@ primitive_types:
       - WebSocket
       - WebRtc
       - BinaryChunks
+  PrimitiveRealtimeSession:
+    provider: PrimitiveProviderKind
+    endpoint: PrimitiveEndpointKind
+    wire_format: ProviderPrimitiveWireFormat
+    stream_mode: PrimitiveStreamMode
+    events: Vec<PrimitiveStreamEvent>
+    usage: Option<PrimitiveUsageTelemetry>
+    metadata: VendorExtensions
 
   PrimitiveAsyncJobOperation:
     variants:

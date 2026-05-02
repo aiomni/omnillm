@@ -452,12 +452,65 @@ impl Gateway {
     pub async fn primitive_realtime(
         &self,
         req: PrimitiveRequest,
-        _cancel: CancellationToken,
+        cancel: CancellationToken,
     ) -> Result<PrimitiveRealtimeSession, GatewayError> {
         self.ensure_primitive_supported(&req)?;
-        Err(GatewayError::Protocol(
-            "primitive realtime transport is scaffolded but not implemented".into(),
-        ))
+        if req.stream != PrimitiveStreamMode::WebSocket {
+            return Err(GatewayError::Protocol(
+                "primitive realtime currently supports WebSocket transport only; WebRTC is planned"
+                    .into(),
+            ));
+        }
+
+        let est_tokens = req.estimated_tokens();
+        let est_cost = primitive_estimated_cost(&req);
+        let lease = self
+            .pool
+            .acquire(est_tokens)
+            .ok_or(GatewayError::NoAvailableKey)?;
+
+        if !self.budget.try_reserve(est_cost) {
+            return Err(GatewayError::BudgetExceeded);
+        }
+
+        if !lease.inner.rpm_window.try_acquire() {
+            self.budget.settle(est_cost, 0);
+            return Err(GatewayError::RateLimited);
+        }
+
+        let result = tokio::select! {
+            res = self.dispatcher.primitive_realtime(&lease, &req) => res,
+            _ = cancel.cancelled() => Err(ApiError::Cancelled),
+        };
+
+        match &result {
+            Ok(session) => {
+                let actual = session
+                    .usage
+                    .as_ref()
+                    .and_then(|usage| usage.token_usage.as_ref())
+                    .map(|usage| pricing::actual(usage, req.model_name()))
+                    .unwrap_or(est_cost);
+                self.budget.settle(est_cost, actual);
+                self.pool.report_success(&lease);
+            }
+            Err(ApiError::Cancelled) => {
+                self.budget.settle(est_cost, 0);
+            }
+            Err(ApiError::RateLimited { .. })
+            | Err(ApiError::Unauthorized)
+            | Err(ApiError::Provider(_))
+            | Err(ApiError::PrimitiveProvider(_)) => {
+                self.budget.settle(est_cost, 0);
+                self.pool
+                    .report_error(&lease, result.as_ref().err().expect("checked above"));
+            }
+            Err(ApiError::Protocol(_)) => {
+                self.budget.settle(est_cost, 0);
+            }
+        }
+
+        result.map_err(map_api_error)
     }
 
     fn ensure_primitive_supported(&self, req: &PrimitiveRequest) -> Result<(), GatewayError> {

@@ -1,6 +1,10 @@
-use std::{io, time::Duration};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use omnillm::{
     embedded_primitive_provider_registry, GatewayBuilder, GatewayError, KeyConfig, MultipartField,
     MultipartValue, PrimitiveAsyncJobOperation, PrimitiveAsyncJobRequest, PrimitiveAsyncJobStatus,
@@ -12,6 +16,13 @@ use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tokio_tungstenite::{
+    accept_hdr_async,
+    tungstenite::{
+        handshake::server::{Request as WsRequest, Response as WsResponse},
+        Message as WsMessage,
+    },
+};
 use tokio_util::sync::CancellationToken;
 
 #[test]
@@ -892,7 +903,183 @@ async fn primitive_sse_stream_cancellation_refunds_without_usage() {
 }
 
 #[tokio::test]
-async fn primitive_realtime_is_explicit_scaffold() {
+async fn primitive_realtime_openai_websocket_preserves_messages_and_settles_usage() {
+    let (base_url, server) = spawn_websocket_server(vec![
+        json!({"type":"session.created","session":{"id":"sess_1"}}),
+        json!({
+            "type":"response.done",
+            "response":{"usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12}}
+        }),
+    ])
+    .await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::Realtime,
+        ProviderPrimitiveWireFormat::OpenAiRealtime,
+        "gpt-4o-realtime-preview",
+        json!({"type":"session.update","session":{"modalities":["text"]}}),
+    )
+    .with_query("mode", "test")
+    .with_header("x-realtime-test", "yes")
+    .with_stream(PrimitiveStreamMode::WebSocket);
+
+    let session = gateway
+        .primitive_realtime(request, CancellationToken::new())
+        .await
+        .expect("realtime session succeeds");
+
+    assert_eq!(session.provider, PrimitiveProviderKind::OpenAi);
+    assert_eq!(session.stream_mode, PrimitiveStreamMode::WebSocket);
+    assert!(session
+        .events
+        .iter()
+        .any(|event| matches!(event, PrimitiveStreamEvent::WebSocketMessage { text: Some(text), .. } if text.contains("session.created"))));
+    let usage = session.usage.expect("usage extracted");
+    let tokens = usage.token_usage.expect("token usage");
+    assert_eq!(tokens.prompt_tokens, 10);
+    assert_eq!(tokens.completion_tokens, 2);
+    assert!((gateway.budget_used_usd() - 0.000080).abs() < 1e-12);
+
+    let capture = server.await.expect("server joins").expect("server ok");
+    assert_eq!(capture.path_and_query, "/realtime/sessions?mode=test");
+    assert_eq!(capture.authorization.as_deref(), Some("Bearer sk-test"));
+    assert_eq!(capture.custom_header.as_deref(), Some("yes"));
+    assert!(capture
+        .initial_text
+        .as_deref()
+        .expect("initial text")
+        .contains("session.update"));
+}
+
+#[tokio::test]
+async fn primitive_realtime_gemini_live_websocket_preserves_messages_and_settles_usage() {
+    let (base_url, server) = spawn_websocket_server(vec![json!({
+        "serverContent": {
+            "modelTurn": {"parts": [{"text": "hello"}]},
+            "usageMetadata": {
+                "promptTokenCount": 20,
+                "candidatesTokenCount": 4,
+                "totalTokenCount": 24
+            }
+        }
+    })])
+    .await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::Gemini,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::Gemini,
+        PrimitiveEndpointKind::Live,
+        ProviderPrimitiveWireFormat::GeminiLive,
+        "gemini-2.5-flash",
+        json!({"setup":{"model":"models/gemini-2.5-flash"}}),
+    )
+    .with_path("/live")
+    .with_stream(PrimitiveStreamMode::WebSocket);
+
+    let session = gateway
+        .primitive_realtime(request, CancellationToken::new())
+        .await
+        .expect("gemini live succeeds");
+
+    assert_eq!(session.provider, PrimitiveProviderKind::Gemini);
+    assert!(session
+        .events
+        .iter()
+        .any(|event| matches!(event, PrimitiveStreamEvent::Usage { .. })));
+    let tokens = session
+        .usage
+        .expect("usage extracted")
+        .token_usage
+        .expect("token usage");
+    assert_eq!(tokens.prompt_tokens, 20);
+    assert_eq!(tokens.completion_tokens, 4);
+    assert_eq!(tokens.total_tokens, Some(24));
+    assert!((gateway.budget_used_usd() - 0.000160).abs() < 1e-12);
+
+    let capture = server.await.expect("server joins").expect("server ok");
+    assert_eq!(capture.path_and_query, "/live");
+    assert_eq!(capture.x_goog_api_key.as_deref(), Some("sk-test"));
+}
+
+#[tokio::test]
+async fn primitive_realtime_settles_fallback_error_cancellation_and_webrtc_paths() {
+    let (base_url, server) = spawn_websocket_server(vec![
+        json!({"type":"session.created","session":{"id":"sess_2"}}),
+    ])
+    .await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::Realtime,
+        ProviderPrimitiveWireFormat::OpenAiRealtime,
+        "gpt-4o-realtime-preview",
+        json!({"type":"session.update","session":{"modalities":["text"]}}),
+    )
+    .with_stream(PrimitiveStreamMode::WebSocket);
+    let session = gateway
+        .primitive_realtime(request, CancellationToken::new())
+        .await
+        .expect("no-usage realtime succeeds");
+    assert!(session.usage.is_none());
+    assert!(gateway.budget_used_usd() > 0.0);
+    server.await.expect("server joins").expect("server ok");
+
+    let (base_url, server) =
+        spawn_server(500, Some("text/plain"), b"handshake failed".to_vec()).await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::Realtime,
+        ProviderPrimitiveWireFormat::OpenAiRealtime,
+        "gpt-4o-realtime-preview",
+        json!({"type":"session.update"}),
+    )
+    .with_stream(PrimitiveStreamMode::WebSocket);
+    let err = gateway
+        .primitive_realtime(request, CancellationToken::new())
+        .await
+        .expect_err("handshake error surfaces");
+    assert!(matches!(err, GatewayError::PrimitiveProvider(_)));
+    assert_eq!(gateway.budget_used_usd(), 0.0);
+    server.await.expect("server joins").expect("server ok");
+
+    let (base_url, server) = spawn_hanging_websocket_server().await;
+    let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
+        PrimitiveProviderKind::OpenAi,
+        base_url,
+    ));
+    let request = PrimitiveRequest::json(
+        PrimitiveProviderKind::OpenAi,
+        PrimitiveEndpointKind::Realtime,
+        ProviderPrimitiveWireFormat::OpenAiRealtime,
+        "gpt-4o-realtime-preview",
+        json!({"type":"session.update"}),
+    )
+    .with_stream(PrimitiveStreamMode::WebSocket);
+    let cancel = CancellationToken::new();
+    let (result, _) = tokio::join!(gateway.primitive_realtime(request, cancel.clone()), async {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        cancel.cancel();
+    });
+    assert!(matches!(
+        result.expect_err("cancelled"),
+        GatewayError::Cancelled
+    ));
+    assert_eq!(gateway.budget_used_usd(), 0.0);
+    server.abort();
+
     let gateway = primitive_gateway(PrimitiveProviderEndpoint::new(
         PrimitiveProviderKind::OpenAi,
         "http://127.0.0.1:9",
@@ -901,16 +1088,100 @@ async fn primitive_realtime_is_explicit_scaffold() {
         PrimitiveProviderKind::OpenAi,
         PrimitiveEndpointKind::Realtime,
         ProviderPrimitiveWireFormat::OpenAiRealtime,
-        "gpt-realtime",
-        json!({"model":"gpt-realtime"}),
+        "gpt-4o-realtime-preview",
+        json!({"type":"session.update"}),
     )
-    .with_stream(PrimitiveStreamMode::WebSocket);
-
+    .with_stream(PrimitiveStreamMode::WebRtc);
     let err = gateway
         .primitive_realtime(request, CancellationToken::new())
         .await
-        .expect_err("realtime is scaffolded");
+        .expect_err("webrtc remains planned");
     assert!(matches!(err, GatewayError::Protocol(_)));
+    assert_eq!(gateway.budget_used_usd(), 0.0);
+}
+
+#[derive(Debug, Clone, Default)]
+struct WebSocketCapture {
+    path_and_query: String,
+    authorization: Option<String>,
+    x_goog_api_key: Option<String>,
+    custom_header: Option<String>,
+    initial_text: Option<String>,
+}
+
+type WebSocketTestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+async fn spawn_websocket_server(
+    messages: Vec<serde_json::Value>,
+) -> (String, JoinHandle<WebSocketTestResult<WebSocketCapture>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("local addr");
+    let capture = Arc::new(Mutex::new(WebSocketCapture::default()));
+    let handle = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await?;
+        let capture_for_headers = Arc::clone(&capture);
+        let mut websocket =
+            accept_hdr_async(socket, move |request: &WsRequest, response: WsResponse| {
+                let mut capture = capture_for_headers.lock().expect("capture lock");
+                capture.path_and_query = request
+                    .uri()
+                    .path_and_query()
+                    .map(|value| value.as_str().to_string())
+                    .unwrap_or_else(|| request.uri().path().to_string());
+                capture.authorization = websocket_header(request, "authorization");
+                capture.x_goog_api_key = websocket_header(request, "x-goog-api-key");
+                capture.custom_header = websocket_header(request, "x-realtime-test");
+                Ok(response)
+            })
+            .await?;
+
+        if let Some(message) = websocket.next().await {
+            match message? {
+                WsMessage::Text(text) => {
+                    capture.lock().expect("capture lock").initial_text = Some(text.to_string());
+                }
+                WsMessage::Binary(data) => {
+                    capture.lock().expect("capture lock").initial_text =
+                        Some(format!("binary:{}", data.len()));
+                }
+                _ => {}
+            }
+        }
+
+        for message in messages {
+            websocket
+                .send(WsMessage::Text(message.to_string().into()))
+                .await?;
+        }
+        websocket.close(None).await?;
+        Ok(capture.lock().expect("capture lock").clone())
+    });
+    (format!("http://{addr}"), handle)
+}
+
+async fn spawn_hanging_websocket_server() -> (String, JoinHandle<WebSocketTestResult<()>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("local addr");
+    let handle = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await?;
+        let mut websocket =
+            accept_hdr_async(socket, |_request: &WsRequest, response: WsResponse| {
+                Ok(response)
+            })
+            .await?;
+        let _ = websocket.next().await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        Ok(())
+    });
+    (format!("http://{addr}"), handle)
+}
+
+fn websocket_header(request: &WsRequest, name: &str) -> Option<String> {
+    request
+        .headers()
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
 }
 
 async fn call_async_job_capture(

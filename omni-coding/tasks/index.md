@@ -16,13 +16,13 @@ Plans:
 - No active tasks.
 
 ## Todo
-- `task-primitive-provider-scope-009`: Implement realtime session transports
 - `task-primitive-provider-scope-010`: Finalize primitive expansion docs validation and support claims
 
 ## Blocked
 - No blocked tasks.
 
 ## Done
+- `task-primitive-provider-scope-009`: Implement realtime session transports
 - `task-primitive-provider-scope-008`: Implement binary chunk streaming transport
 - `task-primitive-provider-scope-007`: Implement P2 batch lifecycle providers
 - `task-primitive-provider-scope-006`: Define primitive async job lifecycle
@@ -51,7 +51,7 @@ Plans:
 - `task-prompt-cache-008`: Update prompt cache documentation
 
 ## Critical Path
-- Primitive provider scope expansion: scope guardrails, P1 HTTP gaps, and P2 async jobs done; todo through P3 transports and final support claim audit.
+- Primitive provider scope expansion: scope guardrails, P1 HTTP gaps, P2 async jobs, and P3 transports done; final support claim audit remains.
 - Primitive protocol: completed through canonical guardrails, primitive model, registry, non-stream execution, unified budget projection, provider family slices, SSE stream scaffold, realtime scaffold, docs, examples, config/spec sync, and validation.
 - Prompt cache: completed.
 
@@ -59,7 +59,7 @@ Plans:
 - Primitive Provider Expansion Milestone 1: scope guardrails — done.
 - Primitive Provider Expansion Milestone 2: P1 HTTP gaps — done.
 - Primitive Provider Expansion Milestone 3: P2 async jobs — done.
-- Primitive Provider Expansion Milestone 4: P3 transports — todo.
+- Primitive Provider Expansion Milestone 4: P3 transports — done.
 - Primitive Provider Expansion Milestone 5: final support claim audit — todo.
 - Primitive Milestone 1: canonical guardrails and public mode boundary — done.
 - Primitive Milestone 2: primitive registry and non-stream execution — done.
