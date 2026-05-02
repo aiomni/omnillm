@@ -78,12 +78,13 @@ pub use gateway::{Gateway, GatewayBuilder, GatewayStream, PrimitiveGatewayStream
 pub use key::lease::KeyLease;
 pub use key::pool::KeyStatus;
 pub use primitive::{
-    embedded_primitive_provider_registry, PrimitiveBillableUnit, PrimitiveBudgetClass,
-    PrimitiveEndpointKind, PrimitiveEndpointSupport, PrimitiveProviderDescriptor,
-    PrimitiveProviderEndpoint, PrimitiveProviderError, PrimitiveProviderKind,
-    PrimitiveProviderRegistry, PrimitiveRealtimeSession, PrimitiveRequest, PrimitiveResponse,
-    PrimitiveStreamEvent, PrimitiveStreamMode, PrimitiveSupportTier, PrimitiveUsageTelemetry,
-    ProviderPrimitiveWireFormat,
+    embedded_primitive_provider_registry, PrimitiveAsyncJobOperation, PrimitiveAsyncJobRequest,
+    PrimitiveAsyncJobResponse, PrimitiveAsyncJobStatus, PrimitiveBillableUnit,
+    PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveEndpointSupport,
+    PrimitiveProviderDescriptor, PrimitiveProviderEndpoint, PrimitiveProviderError,
+    PrimitiveProviderKind, PrimitiveProviderRegistry, PrimitiveRealtimeSession, PrimitiveRequest,
+    PrimitiveResponse, PrimitiveStreamEvent, PrimitiveStreamMode, PrimitiveSupportTier,
+    PrimitiveUsageTelemetry, ProviderPrimitiveWireFormat,
 };
 pub use protocol::{
     emit_error, emit_request, emit_response, emit_stream_event, parse_error, parse_request,

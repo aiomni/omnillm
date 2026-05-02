@@ -16,6 +16,7 @@ implementation_state:
   primitive_call: implemented
   primitive_stream_sse: implemented
   primitive_realtime: scaffolded_explicit_protocol_error
+  primitive_async_job: lifecycle_boundary_defined
   shared_key_pool: implemented
   shared_budget_tracker: implemented
   provider_native_payload_preservation: implemented
@@ -30,11 +31,15 @@ input:
   primitive_realtime:
     request: PrimitiveRequest
     cancel: CancellationToken
+  primitive_async_job:
+    request: PrimitiveAsyncJobRequest
+    cancel: CancellationToken
 
 output:
   primitive_call: Result<PrimitiveResponse, GatewayError>
   primitive_stream: Result<PrimitiveGatewayStream, GatewayError>
   primitive_realtime: Result<PrimitiveRealtimeSession, GatewayError>
+  primitive_async_job: Result<PrimitiveAsyncJobResponse, GatewayError>
 
 pipeline:
   preflight_order:
@@ -90,6 +95,16 @@ pipeline:
       key_state: report_error_for_unauthorized_rate_limited_provider
     eof_without_completed:
       cost: pricing_from_latest_usage_or_estimate
+      key_state: report_success
+  async_job_settlement:
+    create_get_list_cancel:
+      cost: zero_unless_provider_usage_present
+      key_state: report_success_or_error
+    results_with_usage:
+      cost: pricing_from_provider_usage
+      key_state: report_success
+    results_without_usage:
+      cost: reserved_estimate_or_zero_by_budget_class
       key_state: report_success
   realtime_settlement:
     session_open_error:

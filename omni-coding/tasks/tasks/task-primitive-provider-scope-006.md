@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-006
 title: Define primitive async job lifecycle
-status: todo
+status: done
 priority: P0
 tags: [primitive-provider-scope, async-jobs, budget]
 project: primitive-provider-scope-expansion
@@ -24,11 +24,11 @@ Batch APIs are async job lifecycles and should not be hidden inside ordinary one
 - Keep async job lifecycle additive and separate from canonical calls.
 
 # Execution Steps
-- [ ] Draft current Spec patch for primitive async job lifecycle if existing specs are insufficient.
-- [ ] Define public or crate-internal async job types and operation states needed by batch providers.
-- [ ] Define budget semantics for job create, metadata polling, cancellation, and result usage settlement.
-- [ ] Define key/RPM behavior for create, poll, cancel, and result retrieval calls.
-- [ ] Add API-surface tests or compile tests for the chosen lifecycle boundary.
+- [x] Draft current Spec patch for primitive async job lifecycle if existing specs are insufficient.
+- [x] Define public or crate-internal async job types and operation states needed by batch providers.
+- [x] Define budget semantics for job create, metadata polling, cancellation, and result usage settlement.
+- [x] Define key/RPM behavior for create, poll, cancel, and result retrieval calls.
+- [x] Add API-surface tests or compile tests for the chosen lifecycle boundary.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -47,10 +47,15 @@ Batch APIs are async job lifecycles and should not be hidden inside ordinary one
 - Recommended action: prefer conservative zero-cost polling and settle only when provider usage is observed.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Added `PrimitiveAsyncJobRequest`, `PrimitiveAsyncJobResponse`, operation/status enums, and `Gateway::primitive_async_job`.
+- Added operation-specific estimated-cost behavior: create/get/list/cancel settle zero unless provider usage appears; results can reserve by request budget class.
+- Validation: `cargo fmt`, `cargo test --test api_surface`, and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; primitive async job lifecycle boundary is defined and test-backed.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source spec tier: `support_tiers.p2_async_job_lifecycle`.

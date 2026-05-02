@@ -91,6 +91,10 @@ reexports:
     - KeyStatus
   primitive:
     - embedded_primitive_provider_registry
+    - PrimitiveAsyncJobOperation
+    - PrimitiveAsyncJobRequest
+    - PrimitiveAsyncJobResponse
+    - PrimitiveAsyncJobStatus
     - PrimitiveBillableUnit
     - PrimitiveBudgetClass
     - PrimitiveEndpointKind

@@ -155,3 +155,21 @@ fn public_api_exposes_primitive_registry_and_request_types() {
     );
     assert_eq!(request.model_name(), "gpt-4o");
 }
+
+#[test]
+fn public_api_exposes_primitive_async_job_types() {
+    let request = omnillm::PrimitiveRequest::json(
+        omnillm::PrimitiveProviderKind::OpenAi,
+        omnillm::PrimitiveEndpointKind::Batches,
+        omnillm::ProviderPrimitiveWireFormat::OpenAiResponses,
+        "gpt-4o",
+        json!({"input_file_id":"file_1"}),
+    );
+    let job = omnillm::PrimitiveAsyncJobRequest::new(
+        omnillm::PrimitiveAsyncJobOperation::Create,
+        request,
+    )
+    .with_job_id("batch_1");
+    assert_eq!(job.job_id.as_deref(), Some("batch_1"));
+    assert_eq!(job.estimated_cost(), 0);
+}

@@ -163,6 +163,31 @@ primitive_types:
       - WebSocket
       - WebRtc
       - BinaryChunks
+
+  PrimitiveAsyncJobOperation:
+    variants:
+      - Create
+      - Get
+      - List
+      - Cancel
+      - Results
+  PrimitiveAsyncJobStatus:
+    variants:
+      - Pending
+      - Running
+      - Succeeded
+      - Failed
+      - Cancelled
+      - Unknown
+  PrimitiveAsyncJobRequest:
+    operation: PrimitiveAsyncJobOperation
+    job_id: Option<String>
+    request: PrimitiveRequest
+  PrimitiveAsyncJobResponse:
+    operation: PrimitiveAsyncJobOperation
+    job_id: Option<String>
+    status: PrimitiveAsyncJobStatus
+    response: PrimitiveResponse
   PrimitiveUsageTelemetry:
     raw_usage: serde_json::Value
     token_usage: Option<TokenUsage>

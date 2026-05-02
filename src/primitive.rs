@@ -113,6 +113,78 @@ pub enum PrimitiveStreamMode {
     BinaryChunks,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrimitiveAsyncJobOperation {
+    Create,
+    Get,
+    List,
+    Cancel,
+    Results,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrimitiveAsyncJobStatus {
+    Pending,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrimitiveAsyncJobRequest {
+    pub operation: PrimitiveAsyncJobOperation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub job_id: Option<String>,
+    pub request: PrimitiveRequest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrimitiveAsyncJobResponse {
+    pub operation: PrimitiveAsyncJobOperation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub job_id: Option<String>,
+    pub status: PrimitiveAsyncJobStatus,
+    pub response: PrimitiveResponse,
+}
+
+impl PrimitiveAsyncJobRequest {
+    pub fn new(operation: PrimitiveAsyncJobOperation, request: PrimitiveRequest) -> Self {
+        Self {
+            operation,
+            job_id: None,
+            request,
+        }
+    }
+
+    pub fn with_job_id(mut self, job_id: impl Into<String>) -> Self {
+        self.job_id = Some(job_id.into());
+        self
+    }
+
+    pub fn estimated_cost(&self) -> u64 {
+        match self.operation {
+            PrimitiveAsyncJobOperation::Results => match self.request.budget_class() {
+                PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost
+                | PrimitiveBudgetClass::UploadOrStorage => 0,
+                PrimitiveBudgetClass::TokenMetered | PrimitiveBudgetClass::BillableUnitMetered => {
+                    crate::pricing::estimate(
+                        self.request.estimated_tokens(),
+                        self.request.model_name(),
+                    )
+                }
+            },
+            PrimitiveAsyncJobOperation::Create
+            | PrimitiveAsyncJobOperation::Get
+            | PrimitiveAsyncJobOperation::List
+            | PrimitiveAsyncJobOperation::Cancel => 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitiveBillableUnit {
     pub name: String,
@@ -900,6 +972,38 @@ pub(crate) fn primitive_error_from_body(
         retry_after,
         raw_body: Some(raw_body),
         vendor_extensions: BTreeMap::new(),
+    }
+}
+
+pub(crate) fn extract_async_job_id(response: &PrimitiveResponse) -> Option<String> {
+    let ResponseBody::Json { value } = &response.body else {
+        return None;
+    };
+    value
+        .get("id")
+        .or_else(|| value.get("name"))
+        .or_else(|| value.get("batch_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+pub(crate) fn extract_async_job_status(response: &PrimitiveResponse) -> PrimitiveAsyncJobStatus {
+    let ResponseBody::Json { value } = &response.body else {
+        return PrimitiveAsyncJobStatus::Unknown;
+    };
+    let status = value
+        .get("status")
+        .or_else(|| value.get("state"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match status.as_str() {
+        "pending" | "queued" | "validating" => PrimitiveAsyncJobStatus::Pending,
+        "running" | "in_progress" | "processing" => PrimitiveAsyncJobStatus::Running,
+        "succeeded" | "completed" | "ended" | "done" => PrimitiveAsyncJobStatus::Succeeded,
+        "failed" | "errored" | "expired" => PrimitiveAsyncJobStatus::Failed,
+        "cancelled" | "canceled" | "cancelling" | "canceling" => PrimitiveAsyncJobStatus::Cancelled,
+        _ => PrimitiveAsyncJobStatus::Unknown,
     }
 }
 

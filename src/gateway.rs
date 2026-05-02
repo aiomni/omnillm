@@ -16,8 +16,10 @@ use crate::key::inner::KeyInner;
 use crate::key::pool::{KeyPool, KeyStatus};
 use crate::pricing;
 use crate::primitive::{
-    PrimitiveBudgetClass, PrimitiveProviderEndpoint, PrimitiveRealtimeSession, PrimitiveRequest,
-    PrimitiveResponse, PrimitiveStreamEvent, PrimitiveStreamMode,
+    extract_async_job_id, extract_async_job_status, PrimitiveAsyncJobRequest,
+    PrimitiveAsyncJobResponse, PrimitiveBudgetClass, PrimitiveProviderEndpoint,
+    PrimitiveRealtimeSession, PrimitiveRequest, PrimitiveResponse, PrimitiveStreamEvent,
+    PrimitiveStreamMode,
 };
 use crate::protocol::ProviderEndpoint;
 use crate::types::{LlmRequest, LlmResponse, LlmStreamEvent, Message, MessageRole};
@@ -233,9 +235,40 @@ impl Gateway {
         req: PrimitiveRequest,
         cancel: CancellationToken,
     ) -> Result<PrimitiveResponse, GatewayError> {
+        let est_cost = primitive_estimated_cost(&req);
+        self.primitive_call_with_estimated_cost(req, cancel, est_cost)
+            .await
+    }
+
+    pub async fn primitive_async_job(
+        &self,
+        req: PrimitiveAsyncJobRequest,
+        cancel: CancellationToken,
+    ) -> Result<PrimitiveAsyncJobResponse, GatewayError> {
+        let operation = req.operation;
+        let fallback_job_id = req.job_id.clone();
+        let est_cost = req.estimated_cost();
+        let response = self
+            .primitive_call_with_estimated_cost(req.request, cancel, est_cost)
+            .await?;
+        let job_id = extract_async_job_id(&response).or(fallback_job_id);
+        let status = extract_async_job_status(&response);
+        Ok(PrimitiveAsyncJobResponse {
+            operation,
+            job_id,
+            status,
+            response,
+        })
+    }
+
+    async fn primitive_call_with_estimated_cost(
+        &self,
+        req: PrimitiveRequest,
+        cancel: CancellationToken,
+        est_cost: u64,
+    ) -> Result<PrimitiveResponse, GatewayError> {
         self.ensure_primitive_supported(&req)?;
         let est_tokens = req.estimated_tokens();
-        let est_cost = primitive_estimated_cost(&req);
 
         let lease = self
             .pool
