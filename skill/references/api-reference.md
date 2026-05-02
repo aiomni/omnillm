@@ -106,6 +106,15 @@ Rules:
   `PrimitiveStreamEvent::Usage`; it must not rewrite returned provider bodies.
 - Primitive and canonical paths share the same `BudgetTracker` behavior.
 
+- P1 primitive HTTP gaps are in scope for raw provider calls: OpenAI
+  Files/Uploads/Models/Audio Translations/Image edits/variations, Anthropic
+  Models/Files hardening, and Gemini Models/Operations/Files/Caches hardening.
+- Metadata/read-only primitive endpoints settle zero unless provider usage is
+  reported; uploads use the upload/storage budget class.
+- Do not claim or implement admin, billing, fine-tuning, eval, tuning,
+  managed-agent, hosted RAG control-plane, webhook, or SDK-helper parity unless
+  current Specs explicitly promote that scope.
+
 ## Canonical Generation Types
 
 OmniLLM normalizes generation around `LlmRequest` and `LlmResponse`.

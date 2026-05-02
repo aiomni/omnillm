@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-005
 title: Sync P1 primitive support docs and examples
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, docs, examples]
 project: primitive-provider-scope-expansion
@@ -26,11 +26,11 @@ After P1 HTTP gaps land, docs must reflect exact implemented support without imp
 - Keep deferred APIs visibly out of scope.
 
 # Execution Steps
-- [ ] Update README primitive support table and examples.
-- [ ] Update website English and Chinese docs.
-- [ ] Update bundled skill reference API surface notes.
-- [ ] Add or refresh examples for one OpenAI P1 endpoint, one Anthropic P1 endpoint, and one Gemini P1 endpoint.
-- [ ] Record validation commands and support caveats in project/task pages.
+- [x] Update README primitive support table and examples.
+- [x] Update website English and Chinese docs.
+- [x] Update bundled skill reference API surface notes.
+- [x] Add or refresh examples for one OpenAI P1 endpoint, one Anthropic P1 endpoint, and one Gemini P1 endpoint.
+- [x] Record validation commands and support caveats in project/task pages.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -49,10 +49,15 @@ After P1 HTTP gaps land, docs must reflect exact implemented support without imp
 - Recommended action: keep examples minimal and provider-native.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Updated README, website docs, and skill reference with scoped primitive P1 support and deferred API caveats.
+- Added `examples/primitive_p1_metadata_demo.rs` covering OpenAI, Anthropic, and Gemini P1 model metadata calls.
+- Validation: `cargo fmt --check` and `cargo check --examples` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; P1 docs/examples support claim criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source plan phase: P1 low-risk HTTP gaps and documentation.

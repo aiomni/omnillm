@@ -189,6 +189,17 @@ return known usage fields such as OpenAI `usage`, Anthropic `usage`, or Gemini
 `usageMetadata`. Budget settlement uses that telemetry when available and falls
 back to the reserved estimate when no token usage is reported.
 
+Primitive provider support is scoped to model-workload gateway use cases, not full
+provider SDK parity. P1 HTTP gaps include OpenAI Files/Uploads/Models/Audio
+Translations/Image edits/variations, Anthropic Models/Files hardening, and Gemini
+Models/Operations/Files/Caches hardening. Metadata and read-only operations settle
+as zero-cost unless provider usage appears; uploads settle as upload/storage;
+media calls use billable-unit telemetry or reserved-estimate fallback.
+
+Deferred surfaces include admin, billing, webhooks, fine-tuning, evals, tunings,
+managed-agent platforms, hosted RAG/vector-store administration, and SDK helper
+layers.
+
 ## Building a Gateway
 
 `GatewayBuilder` controls the runtime client:

@@ -182,6 +182,10 @@ println!("primitive status={} body={:?}", response.status, response.body);
 
 当 provider 返回 OpenAI `usage`、Anthropic `usage` 或 Gemini `usageMetadata` 等已知字段时，primitive usage telemetry 会保存在 `PrimitiveResponse::usage`。Budget settlement 会优先使用这些 telemetry；没有 token usage 时则回退到预留估算。
 
+Primitive provider support 的边界是模型工作负载网关能力，不追求完整 provider SDK parity。P1 HTTP gaps 包括 OpenAI Files/Uploads/Models/Audio Translations/Image edits/variations、Anthropic Models/Files hardening，以及 Gemini Models/Operations/Files/Caches hardening。Metadata 和 read-only operations 默认 zero-cost；uploads 归为 upload/storage；media calls 使用 billable-unit telemetry 或预留估算回退。
+
+Deferred surfaces 包括 admin、billing、webhooks、fine-tuning、evals、tunings、managed-agent platforms、hosted RAG/vector-store administration 和 SDK helper layers。
+
 ## 构建 Gateway
 
 `GatewayBuilder` 用来配置运行时客户端：

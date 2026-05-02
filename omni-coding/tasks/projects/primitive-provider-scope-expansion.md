@@ -24,7 +24,7 @@
 - Done: P1 OpenAI low-risk HTTP gaps.
 - Done: P1 Anthropic metadata/files hardening.
 - Done: P1 Gemini metadata/operations/files/caches hardening.
-- Todo: P1 docs/examples/support matrix sync.
+- Done: P1 docs/examples/support matrix sync.
 - Todo: P2 primitive async job lifecycle design and runtime shape.
 - Todo: P2 cross-provider batch lifecycle implementation.
 - Todo: P3 binary chunk streaming transport.
@@ -33,7 +33,7 @@
 
 ## Milestones
 - Milestone 1: Scope guardrails — done (`task-primitive-provider-scope-001`).
-- Milestone 2: P1 HTTP gaps — tasks 002 through 005.
+- Milestone 2: P1 HTTP gaps — done (`task-primitive-provider-scope-002` through `005`).
 - Milestone 3: P2 async jobs — tasks 006 and 007.
 - Milestone 4: P3 transports — tasks 008 and 009.
 - Milestone 5: final support claim audit — task 010.

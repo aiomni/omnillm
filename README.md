@@ -88,6 +88,21 @@ Primitive mode is explicit: configure a `PrimitiveProviderEndpoint`, send a
 payloads. Usage extraction is side-channel telemetry used for budget settlement;
 it does not rewrite the returned primitive body.
 
+Primitive provider support is intentionally scoped. OmniLLM is not a full provider
+admin SDK; admin, billing, webhooks, fine-tuning, evals, tunings, managed-agent
+platforms, and hosted RAG/vector-store administration remain deferred unless a
+current Spec explicitly promotes them.
+
+Current primitive support tiers:
+
+| Tier | Provider coverage | Budget class |
+| --- | --- | --- |
+| P0 core | OpenAI Responses/Chat/Images/Audio/Embeddings, Anthropic Messages/Count Tokens/Batches/Files, Gemini Generate/Stream/Count/Embed/Files/Caches | token or media fallback |
+| P1 HTTP gaps | OpenAI Files/Uploads/Models/Audio Translations/Image edits/variations, Anthropic Models/Files hardening, Gemini Models/Operations/Files/Caches hardening | zero-cost metadata, upload/storage, or billable-unit fallback |
+| P2 async jobs | Batch lifecycle provider APIs | async job usage when observed |
+| P3 transports | binary chunk streaming and realtime sessions | close/cancel/partial usage settlement |
+| Deferred | admin, billing, fine-tuning, evals, tunings, managed agents, hosted RAG control plane, SDK helpers | out of scope |
+
 ```rust
 use omnillm::{
     GatewayBuilder, KeyConfig, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
