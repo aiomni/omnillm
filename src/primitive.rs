@@ -83,6 +83,7 @@ pub enum ProviderPrimitiveWireFormat {
     OpenAiFiles,
     OpenAiUploads,
     OpenAiModels,
+    OpenAiBatches,
     AnthropicMessages,
     AnthropicCountTokens,
     AnthropicMessageBatches,
@@ -97,6 +98,7 @@ pub enum ProviderPrimitiveWireFormat {
     GeminiCaches,
     GeminiModels,
     GeminiOperations,
+    GeminiBatches,
     BedrockConverse,
     BedrockInvokeModel,
     OpenAiCompatibleChatCompletions,
@@ -697,6 +699,12 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         &[ProviderPrimitiveWireFormat::OpenAiModels],
                         &[PrimitiveStreamMode::None],
                     ),
+                    support(
+                        PrimitiveEndpointKind::Batches,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::OpenAiBatches],
+                        &[PrimitiveStreamMode::None],
+                    ),
                 ],
             },
             PrimitiveProviderDescriptor {
@@ -788,6 +796,12 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         PrimitiveEndpointKind::Operations,
                         SupportLevel::Native,
                         &[ProviderPrimitiveWireFormat::GeminiOperations],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
+                        PrimitiveEndpointKind::Batches,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::GeminiBatches],
                         &[PrimitiveStreamMode::None],
                     ),
                 ],
@@ -1158,6 +1172,7 @@ fn default_path(request: &PrimitiveRequest) -> Option<String> {
         ProviderPrimitiveWireFormat::OpenAiFiles => Some("/files".into()),
         ProviderPrimitiveWireFormat::OpenAiUploads => Some("/uploads".into()),
         ProviderPrimitiveWireFormat::OpenAiModels => Some("/models".into()),
+        ProviderPrimitiveWireFormat::OpenAiBatches => Some("/batches".into()),
         ProviderPrimitiveWireFormat::AnthropicMessages => Some("/messages".into()),
         ProviderPrimitiveWireFormat::AnthropicCountTokens => Some("/messages/count_tokens".into()),
         ProviderPrimitiveWireFormat::AnthropicMessageBatches => Some("/messages/batches".into()),
@@ -1176,6 +1191,7 @@ fn default_path(request: &PrimitiveRequest) -> Option<String> {
         ProviderPrimitiveWireFormat::GeminiCaches => Some("/cachedContents".into()),
         ProviderPrimitiveWireFormat::GeminiModels => Some("/models".into()),
         ProviderPrimitiveWireFormat::GeminiOperations => Some("/operations".into()),
+        ProviderPrimitiveWireFormat::GeminiBatches => Some("/batches".into()),
         ProviderPrimitiveWireFormat::BedrockConverse
         | ProviderPrimitiveWireFormat::BedrockInvokeModel
         | ProviderPrimitiveWireFormat::CustomHttp => None,

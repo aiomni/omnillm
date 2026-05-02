@@ -26,7 +26,7 @@
 - Done: P1 Gemini metadata/operations/files/caches hardening.
 - Done: P1 docs/examples/support matrix sync.
 - Done: P2 primitive async job lifecycle design and runtime shape.
-- Todo: P2 cross-provider batch lifecycle implementation.
+- Done: P2 cross-provider batch lifecycle implementation.
 - Todo: P3 binary chunk streaming transport.
 - Todo: P3 realtime session transport.
 - Todo: final docs, validation, and support claim audit.
@@ -34,7 +34,7 @@
 ## Milestones
 - Milestone 1: Scope guardrails — done (`task-primitive-provider-scope-001`).
 - Milestone 2: P1 HTTP gaps — done (`task-primitive-provider-scope-002` through `005`).
-- Milestone 3: P2 async jobs — tasks 006 and 007.
+- Milestone 3: P2 async jobs — done (`task-primitive-provider-scope-006`, `007`).
 - Milestone 4: P3 transports — tasks 008 and 009.
 - Milestone 5: final support claim audit — task 010.
 

@@ -3,9 +3,10 @@ use std::{io, time::Duration};
 use futures_util::StreamExt;
 use omnillm::{
     embedded_primitive_provider_registry, GatewayBuilder, GatewayError, KeyConfig, MultipartField,
-    MultipartValue, PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
-    PrimitiveProviderKind, PrimitiveRequest, PrimitiveStreamEvent, PrimitiveStreamMode,
-    PrimitiveSupportTier, ProviderEndpoint, ProviderPrimitiveWireFormat, RequestBody, ResponseBody,
+    MultipartValue, PrimitiveAsyncJobOperation, PrimitiveAsyncJobRequest, PrimitiveAsyncJobStatus,
+    PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveProviderEndpoint, PrimitiveProviderKind,
+    PrimitiveRequest, PrimitiveStreamEvent, PrimitiveStreamMode, PrimitiveSupportTier,
+    ProviderEndpoint, ProviderPrimitiveWireFormat, RequestBody, ResponseBody,
 };
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -365,6 +366,107 @@ async fn primitive_anthropic_p1_models_and_files_keep_headers_and_zero_budget() 
         call_and_capture_anthropic(file_get, json!({"id":"file_1"})).await;
     assert!(raw_request.starts_with("GET /files/file_1 HTTP/1.1"));
     assert_eq!(used_usd, 0.0);
+}
+
+#[tokio::test]
+async fn primitive_async_job_batch_lifecycle_supports_openai_anthropic_and_gemini() {
+    let registry = embedded_primitive_provider_registry();
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::OpenAi,
+        ProviderPrimitiveWireFormat::OpenAiBatches,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::Anthropic,
+        ProviderPrimitiveWireFormat::AnthropicMessageBatches,
+        PrimitiveStreamMode::None,
+    ));
+    assert!(registry.supports_wire_format(
+        PrimitiveProviderKind::Gemini,
+        ProviderPrimitiveWireFormat::GeminiBatches,
+        PrimitiveStreamMode::None,
+    ));
+
+    let openai_create = PrimitiveAsyncJobRequest::new(
+        PrimitiveAsyncJobOperation::Create,
+        PrimitiveRequest::json(
+            PrimitiveProviderKind::OpenAi,
+            PrimitiveEndpointKind::Batches,
+            ProviderPrimitiveWireFormat::OpenAiBatches,
+            "batch",
+            json!({"input_file_id":"file_1","endpoint":"/v1/responses"}),
+        ),
+    );
+    let (response, raw_request, used_usd) = call_async_job_capture(
+        PrimitiveProviderEndpoint::openai(),
+        openai_create,
+        json!({"id":"batch_1","status":"validating"}),
+    )
+    .await;
+    assert_eq!(response.job_id.as_deref(), Some("batch_1"));
+    assert_eq!(response.status, PrimitiveAsyncJobStatus::Pending);
+    assert!(raw_request.starts_with("POST /batches HTTP/1.1"));
+    assert_eq!(used_usd, 0.0);
+
+    let anthropic_get = PrimitiveAsyncJobRequest::new(
+        PrimitiveAsyncJobOperation::Get,
+        PrimitiveRequest::get(
+            PrimitiveProviderKind::Anthropic,
+            PrimitiveEndpointKind::Batches,
+            ProviderPrimitiveWireFormat::AnthropicMessageBatches,
+            Option::<String>::None,
+        )
+        .with_path("/messages/batches/msgbatch_1"),
+    );
+    let (response, raw_request, used_usd) = call_async_job_capture(
+        PrimitiveProviderEndpoint::anthropic(),
+        anthropic_get,
+        json!({"id":"msgbatch_1","status":"processing"}),
+    )
+    .await;
+    assert_eq!(response.status, PrimitiveAsyncJobStatus::Running);
+    assert!(raw_request.starts_with("GET /messages/batches/msgbatch_1 HTTP/1.1"));
+    assert_eq!(used_usd, 0.0);
+
+    let gemini_cancel = PrimitiveAsyncJobRequest::new(
+        PrimitiveAsyncJobOperation::Cancel,
+        PrimitiveRequest::json(
+            PrimitiveProviderKind::Gemini,
+            PrimitiveEndpointKind::Batches,
+            ProviderPrimitiveWireFormat::GeminiBatches,
+            "batch",
+            json!({}),
+        )
+        .with_path("/batches/batch_1:cancel"),
+    );
+    let (_, raw_request, used_usd) = call_async_job_capture(
+        PrimitiveProviderEndpoint::gemini(),
+        gemini_cancel,
+        json!({"name":"batch_1","status":"cancelled"}),
+    )
+    .await;
+    assert!(raw_request.starts_with("POST /batches/batch_1:cancel HTTP/1.1"));
+    assert_eq!(used_usd, 0.0);
+
+    let openai_results = PrimitiveAsyncJobRequest::new(
+        PrimitiveAsyncJobOperation::Results,
+        PrimitiveRequest::get(
+            PrimitiveProviderKind::OpenAi,
+            PrimitiveEndpointKind::Batches,
+            ProviderPrimitiveWireFormat::OpenAiBatches,
+            Some("gpt-4o"),
+        )
+        .with_path("/batches/batch_1/results"),
+    );
+    let (response, raw_request, used_usd) = call_async_job_capture(
+        PrimitiveProviderEndpoint::openai(),
+        openai_results,
+        json!({"id":"batch_1","status":"completed","usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5}}),
+    )
+    .await;
+    assert_eq!(response.status, PrimitiveAsyncJobStatus::Succeeded);
+    assert!(raw_request.starts_with("GET /batches/batch_1/results HTTP/1.1"));
+    assert!(used_usd > 0.0);
 }
 
 #[tokio::test]
@@ -766,6 +868,29 @@ async fn primitive_realtime_is_explicit_scaffold() {
         .await
         .expect_err("realtime is scaffolded");
     assert!(matches!(err, GatewayError::Protocol(_)));
+}
+
+async fn call_async_job_capture(
+    endpoint: PrimitiveProviderEndpoint,
+    request: PrimitiveAsyncJobRequest,
+    provider_response: serde_json::Value,
+) -> (omnillm::PrimitiveAsyncJobResponse, String, f64) {
+    let (base_url, server) = spawn_server(
+        200,
+        Some("application/json"),
+        provider_response.to_string().into_bytes(),
+    )
+    .await;
+    let endpoint = PrimitiveProviderEndpoint::new(endpoint.provider, base_url)
+        .with_auth(endpoint.auth_scheme());
+    let gateway = primitive_gateway(endpoint);
+    let response = gateway
+        .primitive_async_job(request, CancellationToken::new())
+        .await
+        .expect("primitive async job succeeds");
+    let used_usd = gateway.budget_used_usd();
+    let raw_request = server.await.expect("server joins").expect("server ok");
+    (response, raw_request, used_usd)
 }
 
 async fn call_and_capture_gemini(

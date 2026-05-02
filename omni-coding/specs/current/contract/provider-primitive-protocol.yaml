@@ -107,6 +107,7 @@ primitive_types:
       - OpenAiFiles
       - OpenAiUploads
       - OpenAiModels
+      - OpenAiBatches
       - AnthropicMessages
       - AnthropicCountTokens
       - AnthropicMessageBatches
@@ -121,6 +122,7 @@ primitive_types:
       - GeminiCaches
       - GeminiModels
       - GeminiOperations
+      - GeminiBatches
       - BedrockConverse
       - BedrockInvokeModel
       - OpenAiCompatibleChatCompletions
