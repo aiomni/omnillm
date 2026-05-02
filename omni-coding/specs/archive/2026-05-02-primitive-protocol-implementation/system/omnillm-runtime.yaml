@@ -1,6 +1,6 @@
 id: system.omnillm.runtime
 kind: system
-version: 2
+version: 1
 status: current
 summary: OmniLLM Rust crate 的运行时边界
 
@@ -39,7 +39,6 @@ visibility:
     - config
     - error
     - key
-    - primitive
     - protocol
     - provider_registry
     - replay
@@ -60,13 +59,11 @@ invariants:
   - runtime_is_async_http
   - provider_payloads_are_json_value_or_transport_body
   - public_surface_is_reexported_from_lib
-  - primitive_runtime_is_additive
 
 semantics:
   current_specs_are_single_source: LLM 默认只读取 omni-coding/specs/current 下的 Spec Objects。
   runtime_is_async_http: Gateway 和 Dispatcher 的外部 IO 通过 tokio 与 reqwest 执行。
   provider_payloads_are_json_value_or_transport_body: Provider wire JSON 保存在 serde_json::Value，非 JSON 经 RequestBody 或 ResponseBody 表达。
-  primitive_runtime_is_additive: primitive module 是 additive public module，不替代 canonical Gateway path。
   public_surface_is_reexported_from_lib: crate 用户通过 src/lib.rs 暴露的 reexport 使用功能。
 
 relations:
@@ -75,6 +72,4 @@ relations:
   constrains:
     - contract.public_api.surface
     - capability.gateway.execute
-    - contract.provider.primitive_protocol
-    - capability.primitive_provider.execute
 

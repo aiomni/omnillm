@@ -21,7 +21,7 @@ summary: 运行时初始化、Gateway 调用、协议桥接、预算跟踪、回
 
 ## 这个库提供什么
 
-OmniLLM 目前有两条主要使用面：
+OmniLLM 目前有三条主要使用面：
 
 1. `Gateway`
    当你需要在运行时发送生成请求，并同时获得以下能力时使用它：
@@ -32,7 +32,10 @@ OmniLLM 目前有两条主要使用面：
    - 预算跟踪
    - 规范化流式事件
 
-2. API 与协议转换辅助工具
+2. Provider primitive runtime API
+   当你需要直接发送 provider-native 请求、并且不希望经过 `LlmRequest`、`LlmResponse`、`ApiRequest` 或 `ApiResponse` 转换时使用它。Primitive 调用复用同一个 `Gateway` Key 池、RPM 防护、timeout 和 `BudgetTracker`。
+
+3. API 与协议转换辅助工具
    当你需要以下能力时使用这一组工具：
    - 把上游原始 payload 解析成规范化类型
    - 把规范化类型重新输出成 provider 的传输格式
@@ -40,7 +43,7 @@ OmniLLM 目前有两条主要使用面：
    - 检查桥接过程和字段损耗元数据
    - 为测试用例清洗请求/响应夹具
 
-注意：当前运行时 `Gateway` 只处理生成请求。向量嵌入、图像、音频与重排序 API 目前以规范化类型转换工具的形式提供，而不是完整的运行时传输客户端。
+注意：`Gateway::call` 和 `Gateway::stream` 仍然是以 OpenAI Responses 为中心的 canonical generation path。Provider primitive API 是显式启用的增量入口，用于发送 provider-native payload，包括 primitive support registry 已启用的非生成 API。
 
 ## 安装
 
@@ -86,7 +89,8 @@ OmniLLM 在仓库的
 - `CapabilitySet` 用来承载跨 provider 的工具、结构化输出、推理、内置工具等能力。
 - `EndpointProtocol` 表示运行时端点配置，包括 `*_compat` 模式。
 - `ProviderProtocol` 表示底层生成协议，供编解码与转码层使用。
-- `ProviderEndpoint` 用于标识请求要发送到哪里，以及如何发送。
+- `ProviderEndpoint` 用于标识 canonical 请求要发送到哪里，以及如何发送。
+- `PrimitiveProviderEndpoint` 与 `PrimitiveRequest` 用于标识 provider-native primitive 请求要发送到哪里，以及如何发送。
 
 对于多端点场景：
 
@@ -134,6 +138,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Provider Primitive Runtime
+
+当你需要 provider-native payload 且不希望经过 canonical 转换时，使用 primitive runtime API。
+原始 body 是 source of truth；OmniLLM 只追加认证、默认 header、query、timeout、base URL/path 推导等 transport metadata。
+
+```rust
+use omnillm::{
+    GatewayBuilder, KeyConfig, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
+    PrimitiveProviderKind, PrimitiveRequest, ProviderEndpoint, ProviderPrimitiveWireFormat,
+};
+use serde_json::json;
+use tokio_util::sync::CancellationToken;
+
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
+let gateway = GatewayBuilder::new(ProviderEndpoint::openai_responses())
+    .primitive_endpoint(PrimitiveProviderEndpoint::anthropic())
+    .add_key(KeyConfig::new("sk-ant-key", "anthropic"))
+    .budget_limit_usd(25.0)
+    .build()?;
+
+let response = gateway
+    .primitive_call(
+        PrimitiveRequest::json(
+            PrimitiveProviderKind::Anthropic,
+            PrimitiveEndpointKind::Messages,
+            ProviderPrimitiveWireFormat::AnthropicMessages,
+            "claude-3-5-sonnet-20241022",
+            json!({
+                "model":"claude-3-5-sonnet-20241022",
+                "messages":[{"role":"user","content":"hello"}],
+                "max_tokens":64
+            }),
+        ),
+        CancellationToken::new(),
+    )
+    .await?;
+println!("primitive status={} body={:?}", response.status, response.body);
+# Ok(())
+# }
+```
+
+当 provider 返回 OpenAI `usage`、Anthropic `usage` 或 Gemini `usageMetadata` 等已知字段时，primitive usage telemetry 会保存在 `PrimitiveResponse::usage`。Budget settlement 会优先使用这些 telemetry；没有 token usage 时则回退到预留估算。
 
 ## 构建 Gateway
 

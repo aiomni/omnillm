@@ -23,7 +23,7 @@ and [implementation.md](./implementation.md).
 
 ## What This Crate Does
 
-OmniLLM has two major surfaces:
+OmniLLM has three major surfaces:
 
 1. `Gateway`
    Use this when you want to send generation requests at runtime with:
@@ -34,7 +34,10 @@ OmniLLM has two major surfaces:
    - budget tracking
    - canonical streaming events
 
-2. API and protocol conversion helpers
+2. Provider primitive runtime APIs
+   Use these when you want to send provider-native requests directly without converting through `LlmRequest`, `LlmResponse`, `ApiRequest`, or `ApiResponse`. Primitive calls reuse the same `Gateway` key pool, RPM guard, timeout, and `BudgetTracker`.
+
+3. API and protocol conversion helpers
    Use these when you want to:
    - parse raw upstream payloads into canonical types
    - emit canonical types back into provider wire formats
@@ -42,7 +45,7 @@ OmniLLM has two major surfaces:
    - inspect bridge and loss metadata
    - sanitize request/response fixtures for tests
 
-Important: the runtime `Gateway` currently handles generation requests only. The embeddings, image, audio, and rerank APIs are exposed as canonical typed conversion helpers, not as a full runtime transport client.
+Important: `Gateway::call` and `Gateway::stream` remain the OpenAI Responses-centered canonical generation path. Provider primitive APIs are explicit additive entry points for raw provider-native payloads, including non-generation APIs where the primitive support registry enables them.
 
 ## Installation
 
@@ -89,7 +92,8 @@ The crate normalizes generation around `LlmRequest` and `LlmResponse`.
 - `CapabilitySet` holds cross-provider features like tools, structured output, reasoning, and builtin tools.
 - `EndpointProtocol` identifies a runtime endpoint profile, including `*_compat` modes.
 - `ProviderProtocol` identifies a low-level generation wire protocol used by codecs and transcoding.
-- `ProviderEndpoint` identifies where and how to send a request.
+- `ProviderEndpoint` identifies where and how to send a canonical request.
+- `PrimitiveProviderEndpoint` and `PrimitiveRequest` identify where and how to send a provider-native primitive request.
 
 For multi-endpoint work:
 
@@ -137,6 +141,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Provider Primitive Runtime
+
+Use primitive runtime APIs when you need provider-native payloads without canonical conversion.
+The raw body is the source of truth; OmniLLM only adds transport metadata such as
+auth, default headers, query parameters, timeout, and base URL/path resolution.
+
+```rust
+use omnillm::{
+    GatewayBuilder, KeyConfig, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
+    PrimitiveProviderKind, PrimitiveRequest, ProviderEndpoint, ProviderPrimitiveWireFormat,
+};
+use serde_json::json;
+use tokio_util::sync::CancellationToken;
+
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
+let gateway = GatewayBuilder::new(ProviderEndpoint::openai_responses())
+    .primitive_endpoint(PrimitiveProviderEndpoint::anthropic())
+    .add_key(KeyConfig::new("sk-ant-key", "anthropic"))
+    .budget_limit_usd(25.0)
+    .build()?;
+
+let response = gateway
+    .primitive_call(
+        PrimitiveRequest::json(
+            PrimitiveProviderKind::Anthropic,
+            PrimitiveEndpointKind::Messages,
+            ProviderPrimitiveWireFormat::AnthropicMessages,
+            "claude-3-5-sonnet-20241022",
+            json!({
+                "model":"claude-3-5-sonnet-20241022",
+                "messages":[{"role":"user","content":"hello"}],
+                "max_tokens":64
+            }),
+        ),
+        CancellationToken::new(),
+    )
+    .await?;
+println!("primitive status={} body={:?}", response.status, response.body);
+# Ok(())
+# }
+```
+
+Primitive usage telemetry is stored on `PrimitiveResponse::usage` when providers
+return known usage fields such as OpenAI `usage`, Anthropic `usage`, or Gemini
+`usageMetadata`. Budget settlement uses that telemetry when available and falls
+back to the reserved estimate when no token usage is reported.
 
 ## Building a Gateway
 

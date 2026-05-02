@@ -1,0 +1,224 @@
+id: contract.primitive_provider.scope
+kind: contract
+version: 1
+status: current
+summary: Provider primitive API scope and expansion boundary
+
+sources:
+  policy_files:
+    - AGENTS.md
+  constrained_specs:
+    - contract.provider.primitive_protocol
+    - capability.primitive_provider.execute
+    - capability.budget.cost
+
+positioning:
+  product_role:
+    - llm_gateway
+    - budget_tracker
+    - protocol_bridge
+    - provider_native_transport_facade
+  non_roles:
+    - provider_admin_sdk
+    - billing_or_audit_console
+    - managed_agent_platform_sdk
+    - hosted_rag_control_plane
+    - provider_sdk_helper_parity_layer
+
+scope_rules:
+  include_when_all_true:
+    - provider_native_payload_is_primary_value
+    - endpoint_invokes_or_supports_model_workload
+    - budget_or_zero_cost_classification_is_explicit
+    - lifecycle_fits_call_stream_realtime_or_async_job
+    - unsupported_mode_can_fail_before_dispatch
+  exclude_by_default:
+    - provider_admin
+    - organization_project_user_key_management
+    - billing_usage_audit_reporting
+    - webhooks
+    - fine_tuning
+    - evals
+    - graders
+    - tunings
+    - managed_agents
+    - hosted_rag_or_vector_store_administration
+    - sdk_convenience_helpers
+  explicit_spec_required_for_excluded_scope: true
+
+budget_classes:
+  token_metered:
+    examples:
+      - model_generation
+      - embeddings
+      - token_counting
+      - batch_model_processing
+    settlement: provider_usage_or_reserved_estimate
+  billable_unit_metered:
+    examples:
+      - image_generation
+      - audio_transcription
+      - audio_speech
+      - realtime_minutes_or_audio_tokens
+    settlement: provider_billable_units_or_reserved_estimate
+  metadata_or_control_plane_zero_cost:
+    examples:
+      - model_list
+      - model_get
+      - file_get
+      - file_list
+      - operation_get
+    settlement: zero_token_budget_unless_provider_usage_present
+  upload_or_storage:
+    examples:
+      - file_upload
+      - upload_part
+    settlement: zero_token_budget_unless_provider_reports_billable_units
+
+support_tiers:
+  p0_keep_and_harden:
+    acceptance: existing_primitive_http_and_sse_support_remains_green
+    provider_families:
+      OpenAi:
+        - Responses
+        - ChatCompletions
+        - ImagesGenerations
+        - AudioTranscriptions
+        - AudioSpeechNonStreaming
+        - Embeddings
+      Anthropic:
+        - Messages
+        - CountTokens
+        - MessageBatchesCreate
+        - FilesBasic
+      Gemini:
+        - GenerateContent
+        - StreamGenerateContentSse
+        - CountTokens
+        - EmbedContent
+        - FilesBasic
+        - CachesBasic
+      OpenAiCompatible:
+        - ChatCompletions
+        - ResponsesOptional
+        - EmbeddingsOptional
+  p1_low_risk_http_gaps:
+    lifecycle: primitive_call
+    acceptance: raw_payload_preserved_and_budget_classified
+    provider_families:
+      OpenAi:
+        - Files
+        - Uploads
+        - Models
+        - AudioTranslations
+        - ImagesEditsAndVariationsPathCoverage
+      Anthropic:
+        - Models
+        - FilesPathCoverage
+      Gemini:
+        - Models
+        - OperationsReadOnly
+        - FilesPathCoverage
+        - CachesPathCoverage
+  p2_async_job_lifecycle:
+    lifecycle: primitive_async_job
+    acceptance: create_get_list_cancel_results_paths_have_settlement_rules
+    provider_families:
+      OpenAi:
+        - Batches
+      Anthropic:
+        - MessageBatchesLifecycle
+      Gemini:
+        - Batches
+        - OperationsPolling
+  p3_transport_expansion:
+    lifecycle:
+      - primitive_stream
+      - primitive_realtime
+    acceptance: cancellation_partial_usage_and_close_settle_once
+    provider_families:
+      OpenAi:
+        - AudioSpeechBinaryChunks
+        - RealtimeWebSocket
+        - RealtimeWebRtc
+      Gemini:
+        - LiveWebSocket
+      Anthropic:
+        - MessagesSseHardening
+  deferred_without_explicit_spec:
+    provider_families:
+      OpenAi:
+        - FineTuning
+        - Evals
+        - Graders
+        - VectorStores
+        - AssistantsThreadsRuns
+        - AdminProjectsUsersKeys
+        - Webhooks
+      Anthropic:
+        - AdminUsageCost
+        - ManagedAgents
+        - Skills
+        - Sessions
+        - Environments
+      Gemini:
+        - Tunings
+        - FileSearchStores
+        - ImagenVeoMediaPlatform
+        - HostedRagAdministration
+
+transport_boundaries:
+  http_call:
+    allowed_modes:
+      - None
+    budget_settlement: immediate_response_or_error
+  sse_stream:
+    allowed_modes:
+      - Sse
+    budget_settlement: completed_event_eof_error_or_cancel
+  binary_chunk_stream:
+    allowed_modes:
+      - BinaryChunks
+    budget_settlement: final_usage_billable_units_or_reserved_estimate
+  realtime_session:
+    allowed_modes:
+      - WebSocket
+      - WebRtc
+    budget_settlement: session_close_cancel_or_accumulated_usage
+  async_job:
+    allowed_modes:
+      - None
+    budget_settlement: job_create_zero_or_reserved_and_result_usage_when_observed
+
+constraints:
+  canonical_protocol_stays_openai_responses: true
+  primitive_scope_is_not_full_sdk_parity: true
+  excluded_scope_requires_new_current_spec: true
+  support_claims_require_registry_and_tests: true
+  non_model_metadata_endpoints_must_have_zero_cost_budget_class: true
+  async_jobs_must_not_reuse_simple_call_settlement_without_lifecycle_spec: true
+  realtime_and_binary_streaming_require_transport_specific_acceptance_tests: true
+
+invariants:
+  - primitive_expansion_preserves_gateway_positioning
+  - primitive_expansion_does_not_add_admin_sdk_surface_by_default
+  - primitive_expansion_keeps_budget_classification_explicit
+  - primitive_support_claims_are_test_backed
+  - deferred_apis_do_not_enter_registry_without_scope_promotion
+
+semantics:
+  primitive_expansion_preserves_gateway_positioning: 新增 primitive API 必须服务 LLM gateway、budget 或 provider-native model workload，不把 OmniLLM 变成 provider 管理 SDK。
+  primitive_expansion_does_not_add_admin_sdk_surface_by_default: admin、billing、audit、webhook、managed-agent、fine-tuning、eval、tuning 和 hosted RAG 控制面默认不进入 primitive registry。
+  primitive_expansion_keeps_budget_classification_explicit: 每个新增 endpoint 必须先声明 token、billable unit、zero-cost metadata 或 upload/storage 预算分类。
+  primitive_support_claims_are_test_backed: 文档或 registry 中的 Native/Compatible 支持必须有对应 path、payload、error 和 budget 测试。
+  deferred_apis_do_not_enter_registry_without_scope_promotion: deferred API 只有在新的 current Spec 明确提升后才能进入 primitive support matrix。
+
+relations:
+  depends_on:
+    - contract.provider.primitive_protocol
+    - capability.primitive_provider.execute
+    - capability.budget.cost
+  extends: []
+  constrains:
+    - contract.provider.primitive_protocol
+    - capability.primitive_provider.execute

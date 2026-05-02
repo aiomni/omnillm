@@ -45,6 +45,7 @@ pub mod budget;
 pub mod config;
 pub mod error;
 pub mod key;
+pub mod primitive;
 pub mod protocol;
 pub mod provider_registry;
 pub mod replay;
@@ -73,9 +74,16 @@ pub use api_protocol::{
 pub use budget::tracker::BudgetTracker;
 pub use config::{GatewayConfig, KeyConfig, PoolConfig};
 pub use error::{GatewayError, ProviderError};
-pub use gateway::{Gateway, GatewayBuilder, GatewayStream};
+pub use gateway::{Gateway, GatewayBuilder, GatewayStream, PrimitiveGatewayStream};
 pub use key::lease::KeyLease;
 pub use key::pool::KeyStatus;
+pub use primitive::{
+    embedded_primitive_provider_registry, PrimitiveBillableUnit, PrimitiveEndpointKind,
+    PrimitiveEndpointSupport, PrimitiveProviderDescriptor, PrimitiveProviderEndpoint,
+    PrimitiveProviderError, PrimitiveProviderKind, PrimitiveProviderRegistry,
+    PrimitiveRealtimeSession, PrimitiveRequest, PrimitiveResponse, PrimitiveStreamEvent,
+    PrimitiveStreamMode, PrimitiveUsageTelemetry, ProviderPrimitiveWireFormat,
+};
 pub use protocol::{
     emit_error, emit_request, emit_response, emit_stream_event, parse_error, parse_request,
     parse_response, parse_stream_event, transcode_error, transcode_request, transcode_response,

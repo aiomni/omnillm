@@ -15,10 +15,16 @@ use crate::error::{ApiError, GatewayError};
 use crate::key::inner::KeyInner;
 use crate::key::pool::{KeyPool, KeyStatus};
 use crate::pricing;
+use crate::primitive::{
+    PrimitiveProviderEndpoint, PrimitiveRealtimeSession, PrimitiveRequest, PrimitiveResponse,
+    PrimitiveStreamEvent, PrimitiveStreamMode,
+};
 use crate::protocol::ProviderEndpoint;
 use crate::types::{LlmRequest, LlmResponse, LlmStreamEvent, Message, MessageRole};
 
 pub type GatewayStream = Pin<Box<dyn Stream<Item = Result<LlmStreamEvent, GatewayError>> + Send>>;
+pub type PrimitiveGatewayStream =
+    Pin<Box<dyn Stream<Item = Result<PrimitiveStreamEvent, GatewayError>> + Send>>;
 
 /// The main LLM API gateway.
 pub struct Gateway {
@@ -66,7 +72,8 @@ impl Gateway {
             }
             Err(ApiError::RateLimited { .. })
             | Err(ApiError::Unauthorized)
-            | Err(ApiError::Provider(_)) => {
+            | Err(ApiError::Provider(_))
+            | Err(ApiError::PrimitiveProvider(_)) => {
                 self.budget.settle(est_cost, 0);
                 self.pool
                     .report_error(&lease, result.as_ref().err().expect("checked above"));
@@ -108,7 +115,10 @@ impl Gateway {
                 self.budget.settle(est_cost, 0);
                 if matches!(
                     err,
-                    ApiError::Unauthorized | ApiError::RateLimited { .. } | ApiError::Provider(_)
+                    ApiError::Unauthorized
+                        | ApiError::RateLimited { .. }
+                        | ApiError::Provider(_)
+                        | ApiError::PrimitiveProvider(_)
                 ) {
                     self.pool.report_error(&lease, &err);
                 }
@@ -183,7 +193,7 @@ impl Gateway {
                         budget.settle(est_cost, actual);
                         if matches!(
                             err,
-                            ApiError::Unauthorized | ApiError::RateLimited { .. } | ApiError::Provider(_)
+                            ApiError::Unauthorized | ApiError::RateLimited { .. } | ApiError::Provider(_) | ApiError::PrimitiveProvider(_)
                         ) {
                             pool.report_error(&lease, &err);
                         }
@@ -218,6 +228,212 @@ impl Gateway {
         Ok(Box::pin(stream))
     }
 
+    pub async fn primitive_call(
+        &self,
+        req: PrimitiveRequest,
+        cancel: CancellationToken,
+    ) -> Result<PrimitiveResponse, GatewayError> {
+        self.ensure_primitive_supported(&req)?;
+        let est_tokens = req.estimated_tokens();
+        let est_cost = pricing::estimate(est_tokens, req.model_name());
+
+        let lease = self
+            .pool
+            .acquire(est_tokens)
+            .ok_or(GatewayError::NoAvailableKey)?;
+
+        if !self.budget.try_reserve(est_cost) {
+            return Err(GatewayError::BudgetExceeded);
+        }
+
+        if !lease.inner.rpm_window.try_acquire() {
+            self.budget.settle(est_cost, 0);
+            return Err(GatewayError::RateLimited);
+        }
+
+        let result = tokio::select! {
+            res = self.dispatcher.primitive_call(&lease, &req) => res,
+            _ = cancel.cancelled() => Err(ApiError::Cancelled),
+        };
+
+        match &result {
+            Ok(response) => {
+                let actual = response
+                    .usage
+                    .as_ref()
+                    .and_then(|usage| usage.token_usage.as_ref())
+                    .map(|usage| pricing::actual(usage, req.model_name()))
+                    .unwrap_or(est_cost);
+                self.budget.settle(est_cost, actual);
+                self.pool.report_success(&lease);
+            }
+            Err(ApiError::Cancelled) => {
+                self.budget.settle(est_cost, 0);
+            }
+            Err(ApiError::RateLimited { .. })
+            | Err(ApiError::Unauthorized)
+            | Err(ApiError::Provider(_))
+            | Err(ApiError::PrimitiveProvider(_)) => {
+                self.budget.settle(est_cost, 0);
+                self.pool
+                    .report_error(&lease, result.as_ref().err().expect("checked above"));
+            }
+            Err(ApiError::Protocol(_)) => {
+                self.budget.settle(est_cost, 0);
+            }
+        }
+
+        result.map_err(map_api_error)
+    }
+
+    pub async fn primitive_stream(
+        &self,
+        req: PrimitiveRequest,
+        cancel: CancellationToken,
+    ) -> Result<PrimitiveGatewayStream, GatewayError> {
+        self.ensure_primitive_supported(&req)?;
+        if req.stream != PrimitiveStreamMode::Sse {
+            return Err(GatewayError::Protocol(
+                "primitive_stream currently supports SSE stream mode only".into(),
+            ));
+        }
+
+        let est_tokens = req.estimated_tokens();
+        let est_cost = pricing::estimate(est_tokens, req.model_name());
+
+        let lease = self
+            .pool
+            .acquire(est_tokens)
+            .ok_or(GatewayError::NoAvailableKey)?;
+
+        if !self.budget.try_reserve(est_cost) {
+            return Err(GatewayError::BudgetExceeded);
+        }
+
+        if !lease.inner.rpm_window.try_acquire() {
+            self.budget.settle(est_cost, 0);
+            return Err(GatewayError::RateLimited);
+        }
+
+        let inner = match self.dispatcher.primitive_stream(&lease, &req).await {
+            Ok(stream) => stream,
+            Err(err) => {
+                self.budget.settle(est_cost, 0);
+                if matches!(
+                    err,
+                    ApiError::Unauthorized
+                        | ApiError::RateLimited { .. }
+                        | ApiError::Provider(_)
+                        | ApiError::PrimitiveProvider(_)
+                ) {
+                    self.pool.report_error(&lease, &err);
+                }
+                return Err(map_api_error(err));
+            }
+        };
+
+        let budget = Arc::clone(&self.budget);
+        let pool = Arc::clone(&self.pool);
+        let model = req.model_name().to_string();
+        let stream = try_stream! {
+            let mut inner = inner;
+            let mut latest_usage = None;
+            let mut completed = false;
+
+            loop {
+                let next = tokio::select! {
+                    _ = cancel.cancelled() => {
+                        Some(Err(ApiError::Cancelled))
+                    }
+                    item = inner.next() => item,
+                };
+
+                match next {
+                    Some(Ok(event)) => {
+                        match &event {
+                            PrimitiveStreamEvent::Usage { usage } => {
+                                latest_usage = Some(usage.clone());
+                            }
+                            PrimitiveStreamEvent::Completed { usage } => {
+                                if let Some(usage) = usage.clone() {
+                                    latest_usage = Some(usage);
+                                }
+                                let actual = latest_usage
+                                    .as_ref()
+                                    .and_then(|usage| usage.token_usage.as_ref())
+                                    .map(|usage| pricing::actual(usage, &model))
+                                    .unwrap_or(est_cost);
+                                budget.settle(est_cost, actual);
+                                pool.report_success(&lease);
+                                completed = true;
+                            }
+                            _ => {}
+                        }
+                        yield event;
+                    }
+                    Some(Err(err)) => {
+                        let observed_usage_cost = latest_usage
+                            .as_ref()
+                            .and_then(|usage| usage.token_usage.as_ref())
+                            .map(|usage| pricing::actual(usage, &model));
+                        let actual = if matches!(err, ApiError::Cancelled) {
+                            observed_usage_cost.unwrap_or(0)
+                        } else {
+                            observed_usage_cost.unwrap_or(est_cost)
+                        };
+                        budget.settle(est_cost, actual);
+                        if matches!(
+                            err,
+                            ApiError::Unauthorized
+                                | ApiError::RateLimited { .. }
+                                | ApiError::Provider(_)
+                                | ApiError::PrimitiveProvider(_)
+                        ) {
+                            pool.report_error(&lease, &err);
+                        }
+                        Err(map_api_error(err))?;
+                    }
+                    None => {
+                        if !completed {
+                            let actual = latest_usage
+                                .as_ref()
+                                .and_then(|usage| usage.token_usage.as_ref())
+                                .map(|usage| pricing::actual(usage, &model))
+                                .unwrap_or(est_cost);
+                            budget.settle(est_cost, actual);
+                            pool.report_success(&lease);
+                            yield PrimitiveStreamEvent::Completed { usage: latest_usage.clone() };
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    pub async fn primitive_realtime(
+        &self,
+        req: PrimitiveRequest,
+        _cancel: CancellationToken,
+    ) -> Result<PrimitiveRealtimeSession, GatewayError> {
+        self.ensure_primitive_supported(&req)?;
+        Err(GatewayError::Protocol(
+            "primitive realtime transport is scaffolded but not implemented".into(),
+        ))
+    }
+
+    fn ensure_primitive_supported(&self, req: &PrimitiveRequest) -> Result<(), GatewayError> {
+        if !self.dispatcher.primitive_endpoint().supports(req) {
+            return Err(GatewayError::Protocol(format!(
+                "unsupported primitive endpoint {:?}/{:?}/{:?}/{:?}",
+                req.provider, req.endpoint, req.wire_format, req.stream
+            )));
+        }
+        Ok(())
+    }
+
     pub fn pool_status(&self) -> Vec<KeyStatus> {
         self.pool.status()
     }
@@ -238,6 +454,7 @@ pub struct GatewayBuilder {
     budget_limit_usd: Option<f64>,
     pool_config: PoolConfig,
     request_timeout: Duration,
+    primitive_endpoint: Option<PrimitiveProviderEndpoint>,
 }
 
 impl GatewayBuilder {
@@ -248,6 +465,7 @@ impl GatewayBuilder {
             budget_limit_usd: None,
             pool_config: PoolConfig::default(),
             request_timeout: Duration::from_secs(120),
+            primitive_endpoint: None,
         }
     }
 
@@ -276,6 +494,11 @@ impl GatewayBuilder {
         self
     }
 
+    pub fn primitive_endpoint(mut self, endpoint: PrimitiveProviderEndpoint) -> Self {
+        self.primitive_endpoint = Some(endpoint);
+        self
+    }
+
     pub fn build(self) -> Result<Gateway, GatewayError> {
         if self.keys.is_empty() {
             return Err(GatewayError::NoAvailableKey);
@@ -291,10 +514,15 @@ impl GatewayBuilder {
         let budget = Arc::new(BudgetTracker::new(
             self.budget_limit_usd.unwrap_or(f64::MAX),
         ));
-        let dispatcher = Arc::new(Dispatcher::new(
-            self.provider_endpoint,
-            self.request_timeout,
-        ));
+        let dispatcher = Arc::new(if let Some(primitive_endpoint) = self.primitive_endpoint {
+            Dispatcher::new_with_primitive_endpoint(
+                self.provider_endpoint,
+                primitive_endpoint,
+                self.request_timeout,
+            )
+        } else {
+            Dispatcher::new(self.provider_endpoint, self.request_timeout)
+        });
 
         Ok(Gateway {
             pool,
@@ -313,6 +541,10 @@ impl GatewayBuilder {
             builder = builder.budget_limit_usd(limit);
         }
 
+        if let Some(primitive_endpoint) = config.primitive_endpoint {
+            builder = builder.primitive_endpoint(primitive_endpoint);
+        }
+
         builder.build()
     }
 }
@@ -323,6 +555,7 @@ fn map_api_error(error: ApiError) -> GatewayError {
         ApiError::RateLimited { .. } => GatewayError::RateLimited,
         ApiError::Cancelled => GatewayError::Cancelled,
         ApiError::Provider(error) => GatewayError::Provider(error),
+        ApiError::PrimitiveProvider(error) => GatewayError::PrimitiveProvider(error),
         ApiError::Protocol(message) => GatewayError::Protocol(message),
     }
 }

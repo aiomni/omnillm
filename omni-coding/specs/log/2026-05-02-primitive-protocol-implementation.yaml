@@ -1,0 +1,81 @@
+id: patch.primitive_protocol.implementation
+kind: patch
+created: 2026-05-02
+status: applied
+summary: 同步 primitive protocol 实现状态、public API surface 与 src coverage
+
+operations:
+  - op: update
+    target: contract.public_api.surface
+    expected_version: 1
+    reason: primitive protocol runtime types and Gateway stream alias are now public reexports.
+    changes:
+      set:
+        version: 2
+      add:
+        module_exports.public_modules: primitive
+        reexports.primitive: implemented_public_exports
+        reexports.gateway: PrimitiveGatewayStream
+        invariants: primitive_exports_are_additive
+        relations.depends_on:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute
+  - op: update
+    target: system.omnillm.runtime
+    expected_version: 1
+    reason: src/lib.rs now exposes the primitive public module.
+    changes:
+      set:
+        version: 2
+      add:
+        visibility.public_modules: primitive
+        invariants: primitive_runtime_is_additive
+  - op: update
+    target: contract.gateway.config
+    expected_version: 1
+    reason: GatewayBuilder now has an additive primitive_endpoint override for explicit primitive calls.
+    changes:
+      set:
+        version: 2
+      add:
+        types.GatewayConfig.fields.primitive_endpoint: Option<PrimitiveProviderEndpoint>
+        types.GatewayConfig.accessors.primitive_endpoint: Option<&PrimitiveProviderEndpoint>
+        types.GatewayBuilder.fields.primitive_endpoint: Option<PrimitiveProviderEndpoint>
+        operations.GatewayBuilder::primitive_endpoint: PrimitiveProviderEndpoint
+        operations.GatewayBuilder::from_config: preserves_primitive_endpoint
+        constraints.primitive_endpoint_default_derives_from_provider_endpoint: true
+        invariants: primitive_endpoint_is_additive_builder_override
+        relations.depends_on: contract.provider.primitive_protocol
+  - op: update
+    target: system.src.coverage
+    expected_version: 3
+    reason: src/primitive.rs exists and primitive behavior is mapped to current specs rather than target-only specs.
+    changes:
+      set:
+        version: 4
+      add:
+        coverage.src/primitive.rs:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute
+          - capability.budget.cost
+          - contract.error.model
+      remove:
+        - target_only_spec_ids
+  - op: update
+    target: contract.provider.primitive_protocol
+    expected_version: 1
+    reason: implementation now includes primitive model, registry, non-stream calls, SSE streams, and realtime scaffold.
+    changes:
+      set:
+        version: 2
+      add:
+        implementation_state: implemented_with_realtime_scaffold
+  - op: update
+    target: capability.primitive_provider.execute
+    expected_version: 1
+    reason: primitive call, SSE stream, shared key pool, shared budget tracker, and payload preservation are implemented.
+    changes:
+      set:
+        version: 2
+      add:
+        implementation_state: implemented_with_realtime_scaffold

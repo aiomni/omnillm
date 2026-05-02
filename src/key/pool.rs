@@ -101,7 +101,7 @@ impl KeyPool {
                     .cool_down_until
                     .fetch_max(until, Ordering::AcqRel);
             }
-            ApiError::Provider(_) => {
+            ApiError::Provider(_) | ApiError::PrimitiveProvider(_) => {
                 // Circuit breaker: writes to failure_cool_down_until, NOT cool_down_until.
                 let prev = lease
                     .inner

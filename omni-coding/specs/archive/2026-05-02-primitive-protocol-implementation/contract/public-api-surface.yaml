@@ -1,6 +1,6 @@
 id: contract.public_api.surface
 kind: contract
-version: 2
+version: 1
 status: current
 summary: OmniLLM crate 对外导出的 API Surface
 
@@ -16,7 +16,6 @@ module_exports:
     - config
     - error
     - key
-    - primitive
     - protocol
     - provider_registry
     - replay
@@ -85,27 +84,9 @@ reexports:
     - Gateway
     - GatewayBuilder
     - GatewayStream
-    - PrimitiveGatewayStream
   key:
     - KeyLease
     - KeyStatus
-  primitive:
-    - embedded_primitive_provider_registry
-    - PrimitiveBillableUnit
-    - PrimitiveEndpointKind
-    - PrimitiveEndpointSupport
-    - PrimitiveProviderDescriptor
-    - PrimitiveProviderEndpoint
-    - PrimitiveProviderError
-    - PrimitiveProviderKind
-    - PrimitiveProviderRegistry
-    - PrimitiveRealtimeSession
-    - PrimitiveRequest
-    - PrimitiveResponse
-    - PrimitiveStreamEvent
-    - PrimitiveStreamMode
-    - PrimitiveUsageTelemetry
-    - ProviderPrimitiveWireFormat
   protocol:
     - AuthScheme
     - EndpointProtocol
@@ -176,19 +157,15 @@ invariants:
   - public_api_flows_through_reexports
   - private_modules_remain_internal_implementation
   - exported_types_match_current_contract_specs
-  - primitive_exports_are_additive
 
 semantics:
   public_api_flows_through_reexports: 用户侧稳定入口是 omnillm crate root 的 reexport。
   private_modules_remain_internal_implementation: dispatcher、limiter、pricing 不构成公开兼容性承诺。
   exported_types_match_current_contract_specs: reexport 的类型行为由对应 current contract 或 capability Spec 约束。
-  primitive_exports_are_additive: primitive exports 不改变现有 canonical Gateway、protocol 或 api exports。
 
 relations:
   depends_on:
     - system.omnillm.runtime
-    - contract.provider.primitive_protocol
-    - capability.primitive_provider.execute
   extends: []
   constrains: []
 

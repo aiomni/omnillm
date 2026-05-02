@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use crate::primitive::PrimitiveProviderEndpoint;
 use crate::protocol::ProviderEndpoint;
 
 /// Configuration for a single API key.
@@ -65,6 +66,7 @@ pub struct GatewayConfig {
     pub(crate) budget_limit_usd: Option<f64>,
     pub(crate) pool_config: PoolConfig,
     pub(crate) request_timeout: Duration,
+    pub(crate) primitive_endpoint: Option<PrimitiveProviderEndpoint>,
 }
 
 impl GatewayConfig {
@@ -74,5 +76,9 @@ impl GatewayConfig {
 
     pub fn budget_limit_usd(&self) -> Option<f64> {
         self.budget_limit_usd
+    }
+
+    pub fn primitive_endpoint(&self) -> Option<&PrimitiveProviderEndpoint> {
+        self.primitive_endpoint.as_ref()
     }
 }

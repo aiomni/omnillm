@@ -1,0 +1,32 @@
+id: patch.primitive_provider.scope_policy
+kind: patch
+created: 2026-05-02
+status: applied
+summary: 添加 primitive provider 扩展边界，防止 primitive support 演变为完整 provider SDK parity
+
+operations:
+  - op: add
+    target: contract.primitive_provider.scope
+    reason: 将 OmniLLM 定位为 LLM gateway、budget tracker 和 provider-native protocol bridge，而不是 provider admin SDK。
+    changes:
+      create:
+        file: omni-coding/specs/current/contract/primitive-provider-scope.yaml
+        version: 1
+        support_tiers:
+          - p0_keep_and_harden
+          - p1_low_risk_http_gaps
+          - p2_async_job_lifecycle
+          - p3_transport_expansion
+          - deferred_without_explicit_spec
+  - op: update
+    target: contract.provider.primitive_protocol
+    expected_version: 2
+    reason: 让 primitive protocol 主规格显式依赖新的 scope boundary。
+    changes:
+      set:
+        version: 3
+      add:
+        scope_policy.expansion_boundary: contract.primitive_provider.scope
+        constraints.primitive_expansion_must_follow_scope_policy: true
+        invariants: primitive_expansion_does_not_imply_full_sdk_parity
+        relations.depends_on: contract.primitive_provider.scope

@@ -2,7 +2,7 @@
 
 This directory contains the source bundle for the OmniLLM agent skill. It
 teaches coding agents how OmniLLM's runtime gateway, protocol transcoding
-layer, typed multi-endpoint API, and replay sanitization helpers actually
+layer, typed multi-endpoint API, provider primitive runtime, and replay sanitization helpers actually
 work.
 
 Install this skill with the [Vercel Labs `skills` installer](https://github.com/vercel-labs/skills).
@@ -74,6 +74,7 @@ example:
 - explain when `Gateway` is the right surface versus `transcode_*`
 - debug `NoAvailableKey` or `BudgetExceeded`
 - emit an `ApiRequest` as a provider wire format
+- choose between canonical OpenAI Responses mode and provider primitive mode
 
 If the skill does not appear immediately, restart the agent session and rerun
 `npx skills ls -a <agent>`.

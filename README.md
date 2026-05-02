@@ -60,6 +60,7 @@ The documentation site source lives in the GitHub repository:
 ## Features
 
 - Canonical `Responses + Capability Layer` hybrid request/response model
+- Additive provider primitive protocol mode for raw provider-native payloads
 - Runtime endpoint profiles through `EndpointProtocol`, including official URL derivation and `*_compat` full-URL modes
 - Additive multi-endpoint API layer with canonical request/response types for generation, embeddings, images, audio, and rerank
 - Protocol-aware dispatch for OpenAI Responses, OpenAI Chat Completions, Claude Messages, and Gemini GenerateContent
@@ -69,8 +70,55 @@ The documentation site source lives in the GitHub repository:
 - Replay fixture sanitization helpers for safe record/replay style testing
 - Multi-key load balancing with per-key rate limiting and circuit breaking
 - Lock-free budget tracking with pre-reserve + settle accounting
-- Non-streaming `call` and canonical streaming `stream` APIs
+- Non-streaming `call`, canonical streaming `stream`, primitive `primitive_call`, and primitive SSE `primitive_stream` APIs
 - Bundled OmniLLM Skill in `skill/` for AI-native repo guidance
+
+## Dual Protocol Modes
+
+OmniLLM now exposes two runtime protocol forms:
+
+| Mode | Entry points | Payload model | Use when | Budget |
+| --- | --- | --- | --- | --- |
+| OpenAI Responses canonical | `Gateway::call`, `Gateway::stream` | `LlmRequest`, `LlmResponse`, `LlmStreamEvent` | You want provider-neutral generation with existing OpenAI Responses-centered semantics and provider transcoding | Shared `BudgetTracker` |
+| Provider primitive | `Gateway::primitive_call`, `Gateway::primitive_stream`, `Gateway::primitive_realtime` scaffold | `PrimitiveRequest`, `PrimitiveResponse`, `PrimitiveStreamEvent` | You need raw provider-native APIs such as OpenAI Images/Audio, Anthropic Messages/Count Tokens, Gemini GenerateContent/CountTokens, or OpenAI-compatible raw payloads | Shared `BudgetTracker` |
+
+The canonical path remains the default and does not require primitive configuration.
+Primitive mode is explicit: configure a `PrimitiveProviderEndpoint`, send a
+`PrimitiveRequest`, and OmniLLM preserves the provider-native request and response
+payloads. Usage extraction is side-channel telemetry used for budget settlement;
+it does not rewrite the returned primitive body.
+
+```rust
+use omnillm::{
+    GatewayBuilder, KeyConfig, PrimitiveEndpointKind, PrimitiveProviderEndpoint,
+    PrimitiveProviderKind, PrimitiveRequest, ProviderEndpoint, ProviderPrimitiveWireFormat,
+};
+use serde_json::json;
+use tokio_util::sync::CancellationToken;
+
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
+let gateway = GatewayBuilder::new(ProviderEndpoint::openai_responses())
+    .primitive_endpoint(PrimitiveProviderEndpoint::openai())
+    .add_key(KeyConfig::new("sk-key", "openai"))
+    .budget_limit_usd(10.0)
+    .build()?;
+
+let response = gateway
+    .primitive_call(
+        PrimitiveRequest::json(
+            PrimitiveProviderKind::OpenAi,
+            PrimitiveEndpointKind::Responses,
+            ProviderPrimitiveWireFormat::OpenAiResponses,
+            "gpt-4o",
+            json!({"model":"gpt-4o","input":"hello"}),
+        ),
+        CancellationToken::new(),
+    )
+    .await?;
+println!("status={} usage={:?}", response.status, response.usage);
+# Ok(())
+# }
+```
 
 ## Canonical Model
 

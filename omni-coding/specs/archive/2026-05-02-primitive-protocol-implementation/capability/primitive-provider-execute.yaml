@@ -1,24 +1,16 @@
 id: capability.primitive_provider.execute
 kind: capability
-version: 2
+version: 1
 status: current
 summary: Provider primitive protocol 的非转换执行能力
 
 sources:
-  current_modules:
+  target_modules:
     - src/primitive.rs
     - src/primitive_protocol.rs
     - src/dispatcher.rs
     - src/gateway.rs
     - src/pricing.rs
-
-implementation_state:
-  primitive_call: implemented
-  primitive_stream_sse: implemented
-  primitive_realtime: scaffolded_explicit_protocol_error
-  shared_key_pool: implemented
-  shared_budget_tracker: implemented
-  provider_native_payload_preservation: implemented
 
 input:
   primitive_call:

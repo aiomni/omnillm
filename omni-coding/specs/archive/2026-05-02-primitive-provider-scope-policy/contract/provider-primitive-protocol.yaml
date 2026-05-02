@@ -1,6 +1,6 @@
 id: contract.provider.primitive_protocol
 kind: contract
-version: 3
+version: 2
 status: current
 summary: OpenAI Responses 标准协议与 provider primitive 协议并行
 
@@ -32,12 +32,6 @@ implementation_state:
     VertexAi: compatible_registry_only
     Bedrock: planned_registry_only
     OpenAiCompatible: implemented_non_stream_and_sse_scaffold
-
-scope_policy:
-  expansion_boundary: contract.primitive_provider.scope
-  full_provider_sdk_parity: rejected_by_default
-  excluded_scope_requires_explicit_spec_promotion: true
-  support_claims_require_registry_and_tests: true
 
 protocol_forms:
   OpenAiResponsesStandard:
@@ -310,7 +304,6 @@ constraints:
   primitive_usage_extraction_is_side_channel: true
   primitive_budget_uses_shared_budget_tracker: true
   primitive_registry_is_separate_from_canonical_wire_registry: true
-  primitive_expansion_must_follow_scope_policy: true
 
 invariants:
   - canonical_responses_path_remains_default
@@ -321,7 +314,6 @@ invariants:
   - primitive_budget_settles_once
   - usage_extraction_does_not_change_returned_payload
   - unsupported_primitive_endpoint_fails_before_dispatch
-  - primitive_expansion_does_not_imply_full_sdk_parity
 
 semantics:
   canonical_responses_path_remains_default: 现有 LlmRequest/LlmResponse 调用仍以 OpenAI Responses 作为标准协议入口。
@@ -332,7 +324,6 @@ semantics:
   primitive_budget_settles_once: primitive 成功、错误、取消、流结束和实时会话关闭路径只结算一次。
   usage_extraction_does_not_change_returned_payload: usage parser 只能读取 raw usage 字段并生成 PrimitiveUsageTelemetry。
   unsupported_primitive_endpoint_fails_before_dispatch: registry 不支持的 primitive endpoint 不会发起 HTTP、WebSocket 或 WebRTC 请求。
-  primitive_expansion_does_not_imply_full_sdk_parity: primitive provider 扩展遵循 contract.primitive_provider.scope，不把 OmniLLM 扩展成 provider admin SDK 或完整 SDK parity layer。
 
 relations:
   depends_on:
@@ -344,7 +335,6 @@ relations:
     - contract.provider.registry
     - contract.error.model
     - capability.budget.cost
-    - contract.primitive_provider.scope
   extends: []
   constrains:
     - capability.gateway.execute

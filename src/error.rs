@@ -9,6 +9,7 @@ use std::fmt;
 
 use thiserror::Error;
 
+use crate::primitive::PrimitiveProviderError;
 use crate::protocol::ProviderProtocol;
 
 /// Arbitrary provider-specific error payload.
@@ -70,6 +71,10 @@ pub enum GatewayError {
     #[error(transparent)]
     Provider(ProviderError),
 
+    /// Provider-side failure on the primitive protocol path.
+    #[error(transparent)]
+    PrimitiveProvider(PrimitiveProviderError),
+
     /// Local canonical/protocol conversion failed before or after transport.
     #[error("protocol conversion error: {0}")]
     Protocol(String),
@@ -89,6 +94,8 @@ pub(crate) enum ApiError {
     RateLimited { retry_after: Duration },
     /// Provider-side failure.
     Provider(ProviderError),
+    /// Primitive provider-side failure.
+    PrimitiveProvider(PrimitiveProviderError),
     /// Local protocol conversion failure.
     Protocol(String),
     /// Upstream caller cancelled the request.

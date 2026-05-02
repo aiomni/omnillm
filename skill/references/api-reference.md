@@ -7,6 +7,7 @@ if you need runnable code.
 ## Table Of Contents
 
 - [Runtime Gateway](#runtime-gateway)
+- [Provider Primitive Runtime](#provider-primitive-runtime)
 - [Canonical Generation Types](#canonical-generation-types)
 - [Provider Endpoints And Auth](#provider-endpoints-and-auth)
 - [Protocol Conversion](#protocol-conversion)
@@ -59,6 +60,51 @@ Common `Gateway` methods:
 `KeyConfig::new(key, label)` stores the raw key plus a human-readable label.
 Use `.tpm_limit(...)` and `.rpm_limit(...)` when local quota control matters.
 Labels show up in `pool_status()`.
+
+## Provider Primitive Runtime
+
+Use primitive runtime APIs when the caller needs provider-native request and
+response payloads without canonical conversion. The primitive path is explicit
+and additive; `Gateway::call` and `Gateway::stream` remain the OpenAI
+Responses-centered canonical path.
+
+Core types:
+
+- `PrimitiveProviderEndpoint`
+- `PrimitiveRequest`
+- `PrimitiveResponse`
+- `PrimitiveStreamEvent`
+- `PrimitiveProviderKind`
+- `PrimitiveEndpointKind`
+- `ProviderPrimitiveWireFormat`
+- `PrimitiveStreamMode`
+- `embedded_primitive_provider_registry()`
+
+Builder flow:
+
+```rust
+let gateway = GatewayBuilder::new(ProviderEndpoint::openai_responses())
+    .primitive_endpoint(PrimitiveProviderEndpoint::openai())
+    .add_key(KeyConfig::new("sk-key-1", "openai-prod-1"))
+    .budget_limit_usd(50.0)
+    .build()?;
+```
+
+Common primitive methods:
+
+- `gateway.primitive_call(request, cancel)`
+- `gateway.primitive_stream(request, cancel)` for SSE streams
+- `gateway.primitive_realtime(request, cancel)` currently returns an explicit scaffold error until realtime transport support is complete
+
+Rules:
+
+- Do not convert primitive payloads through `LlmRequest`, `LlmResponse`,
+  `ApiRequest`, or `ApiResponse`.
+- Only transport metadata may be added: auth, default headers, query params,
+  timeout, base URL/path resolution, and stream accept headers.
+- Usage telemetry is side-channel data on `PrimitiveResponse::usage` or stream
+  `PrimitiveStreamEvent::Usage`; it must not rewrite returned provider bodies.
+- Primitive and canonical paths share the same `BudgetTracker` behavior.
 
 ## Canonical Generation Types
 

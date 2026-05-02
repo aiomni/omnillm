@@ -1,6 +1,6 @@
 id: contract.gateway.config
 kind: contract
-version: 2
+version: 1
 status: current
 summary: Gateway 构建配置与默认值
 
@@ -39,11 +39,9 @@ types:
       budget_limit_usd: Option<f64>
       pool_config: PoolConfig
       request_timeout: Duration
-      primitive_endpoint: Option<PrimitiveProviderEndpoint>
     accessors:
       - provider_endpoint
       - budget_limit_usd
-      - primitive_endpoint
   GatewayBuilder:
     fields:
       provider_endpoint: ProviderEndpoint
@@ -51,13 +49,11 @@ types:
       budget_limit_usd: Option<f64>
       pool_config: PoolConfig
       request_timeout: Duration
-      primitive_endpoint: Option<PrimitiveProviderEndpoint>
     defaults:
       keys: []
       budget_limit_usd: null
       pool_config: PoolConfig::default
       request_timeout_seconds: 120
-      primitive_endpoint: null
 
 operations:
   GatewayBuilder::new:
@@ -84,10 +80,6 @@ operations:
     input:
       timeout: Duration
     output: GatewayBuilder
-  GatewayBuilder::primitive_endpoint:
-    input:
-      endpoint: PrimitiveProviderEndpoint
-    output: GatewayBuilder
   GatewayBuilder::build:
     input: GatewayBuilder
     output: Result<Gateway, GatewayError>
@@ -98,7 +90,6 @@ operations:
 
 constraints:
   build_requires_keys: true
-  primitive_endpoint_default_derives_from_provider_endpoint: true
   missing_keys_error: GatewayError::NoAvailableKey
   unspecified_budget_limit_usd: f64::MAX
   key_material_visibility: crate_private
@@ -108,19 +99,16 @@ invariants:
   - pool_defaults_are_applied_when_unset
   - build_fails_without_keys
   - from_config_preserves_configured_timeout_pool_and_budget
-  - primitive_endpoint_is_additive_builder_override
 
 semantics:
   key_defaults_are_applied_at_construction: KeyConfig::new 设置默认 TPM 与 RPM 上限。
   pool_defaults_are_applied_when_unset: GatewayBuilder::new 使用 PoolConfig::default。
   build_fails_without_keys: 空 key 列表不会构造可用 Gateway。
-  from_config_preserves_configured_timeout_pool_and_budget: GatewayConfig 转 Builder 时保留 endpoint、keys、pool_config、request_timeout、budget_limit_usd、primitive_endpoint。
-  primitive_endpoint_is_additive_builder_override: primitive_endpoint 只影响 explicit primitive calls，不改变 canonical call/stream endpoint。
+  from_config_preserves_configured_timeout_pool_and_budget: GatewayConfig 转 Builder 时保留 endpoint、keys、pool_config、request_timeout、budget_limit_usd。
 
 relations:
   depends_on:
     - contract.endpoint.protocol
-    - contract.provider.primitive_protocol
     - contract.error.model
   extends: []
   constrains:

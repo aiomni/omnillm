@@ -1,6 +1,6 @@
 id: system.src.coverage
 kind: system
-version: 4
+version: 3
 status: current
 summary: src 目录功能到 current specs 的覆盖映射
 
@@ -11,26 +11,21 @@ coverage:
   src/lib.rs:
     - system.omnillm.runtime
     - contract.public_api.surface
-    - contract.provider.primitive_protocol
   src/config.rs:
     - contract.gateway.config
   src/gateway.rs:
     - contract.gateway.config
     - capability.gateway.execute
-    - capability.primitive_provider.execute
     - contract.error.model
     - contract.prompt_cache.policy
   src/dispatcher.rs:
     - capability.gateway.execute
-    - capability.primitive_provider.execute
     - contract.error.model
-    - contract.provider.primitive_protocol
   src/error.rs:
     - contract.error.model
   src/pricing.rs:
     - capability.budget.cost
     - contract.prompt_cache.policy
-    - capability.primitive_provider.execute
   src/budget/mod.rs:
     - capability.budget.cost
   src/budget/tracker.rs:
@@ -65,11 +60,6 @@ coverage:
     - contract.prompt_cache.policy
   src/provider_registry.rs:
     - contract.provider.registry
-  src/primitive.rs:
-    - contract.provider.primitive_protocol
-    - capability.primitive_provider.execute
-    - capability.budget.cost
-    - contract.error.model
   src/replay.rs:
     - capability.replay.sanitize
 
@@ -92,19 +82,26 @@ required_spec_ids:
   - capability.replay.sanitize
   - contract.prompt_cache.policy
 
+target_only_spec_ids:
+  - contract.provider.primitive_protocol
+  - capability.primitive_provider.execute
+
 constraints:
   every_src_file_has_at_least_one_spec: true
   generated_specs_are_current_snapshot: true
   coverage_map_is_index_not_behavior_source: true
+  target_only_specs_may_wait_for_src_modules: true
 
 invariants:
   - src_file_coverage_complete
   - coverage_spec_ids_exist_in_current
+  - target_only_spec_ids_exist_in_current
   - behavior_specs_remain_authoritative_over_coverage_index
 
 semantics:
   src_file_coverage_complete: coverage 中列出当前 src 下每个 Rust source file。
   coverage_spec_ids_exist_in_current: coverage 引用的 spec_id 必须在 omni-coding/specs/current 中存在。
+  target_only_spec_ids_exist_in_current: target_only_spec_ids 引用的是已生效但尚未映射到现有 src 文件的目标 Spec。
   behavior_specs_remain_authoritative_over_coverage_index: 行为规则以被引用的 capability 或 contract Spec 为准。
 
 relations:

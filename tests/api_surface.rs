@@ -136,3 +136,22 @@ fn public_replay_fixture_sanitizes_binary_responses() {
     };
     assert_eq!(data_base64, "<redacted:binary_blob>");
 }
+
+#[test]
+fn public_api_exposes_primitive_registry_and_request_types() {
+    let registry = omnillm::embedded_primitive_provider_registry();
+    assert!(registry.supports_wire_format(
+        omnillm::PrimitiveProviderKind::OpenAi,
+        omnillm::ProviderPrimitiveWireFormat::OpenAiResponses,
+        omnillm::PrimitiveStreamMode::None,
+    ));
+
+    let request = omnillm::PrimitiveRequest::json(
+        omnillm::PrimitiveProviderKind::OpenAi,
+        omnillm::PrimitiveEndpointKind::Responses,
+        omnillm::ProviderPrimitiveWireFormat::OpenAiResponses,
+        "gpt-4o",
+        json!({"model":"gpt-4o","input":"hello"}),
+    );
+    assert_eq!(request.model_name(), "gpt-4o");
+}
