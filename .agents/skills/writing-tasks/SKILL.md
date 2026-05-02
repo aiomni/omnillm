@@ -31,6 +31,13 @@ Use these assets when the target repository has no existing task-system conventi
 - If the user's request is in Chinese or another language, respond in that same language and write specs, plans, task cards, reviews, and other generated artifacts in that language.
 - If the user explicitly requests a language, or the surrounding context specifies a language, use that language instead of inferring the language from the request.
 
+## Code Writing Boundary
+
+- Do not write, modify, patch, or generate production code, test code, scripts, or other source files unless the user explicitly asks for direct code implementation or code edits.
+- When the user asks only for Task work, produce task cards, execution steps, acceptance criteria, status synchronization, review notes, or handoff context without changing source code.
+- It is acceptable to reference code paths, describe expected edits, or include clearly labeled illustrative pseudocode when needed for task clarity, but do not apply code changes without explicit user confirmation.
+- If implementation would be useful but the user did not ask for coding, ask for confirmation before writing code.
+
 ## When To Use
 
 Use this skill when:

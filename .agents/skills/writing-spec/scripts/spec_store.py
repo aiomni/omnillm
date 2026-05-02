@@ -7,7 +7,9 @@ import argparse
 import copy
 import datetime as dt
 import re
+import shutil
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,10 @@ except ImportError:  # pragma: no cover
 KINDS = {"capability", "system", "contract"}
 RELATION_KEYS = ("depends_on", "extends", "constrains")
 CHANGE_OPERATOR_KEYS = {"set", "add", "remove"}
+DRAFT_BUCKETS = ("open", "accepted", "rejected", "superseded")
+DRAFT_OPEN_STATUSES = {"researching", "proposed", "validated"}
+DRAFT_TERMINAL_STATUSES = {"accepted", "rejected", "superseded"}
+DRAFT_WORKFLOW_STATUSES = DRAFT_OPEN_STATUSES | DRAFT_TERMINAL_STATUSES
 BAD_VERSION_NAME = re.compile(r"(^|[_.-])(v\d+|final|latest|new)([_.-]|$)", re.IGNORECASE)
 FORBIDDEN_CURRENT_KEYS = {
     "description",
@@ -35,6 +41,27 @@ FORBIDDEN_CURRENT_KEYS = {
 
 class SpecError(Exception):
     pass
+
+
+@dataclass
+class PlannedPatch:
+    patch: dict[str, Any]
+    op: str
+    target: str
+    written_path: Path | None = None
+    old_spec: dict[str, Any] | None = None
+    old_spec_path: Path | None = None
+    deleted_guides: list[tuple[dict[str, Any], Path]] = field(default_factory=list)
+
+
+@dataclass
+class PatchResult:
+    op: str
+    target: str
+    current_path: Path | None = None
+    archive_path: Path | None = None
+    log_path: Path | None = None
+    guide_archive_paths: list[Path] = field(default_factory=list)
 
 
 def require_yaml() -> None:
@@ -61,6 +88,8 @@ def ensure_layout(root: Path) -> None:
             (root / base / kind).mkdir(parents=True, exist_ok=True)
     for relative in ("log", "archive"):
         (root / relative).mkdir(parents=True, exist_ok=True)
+    for bucket in DRAFT_BUCKETS:
+        (root / "drafts" / bucket).mkdir(parents=True, exist_ok=True)
 
 
 def object_path(root: Path, base: str, object_id: str) -> Path:
@@ -76,6 +105,20 @@ def spec_path(root: Path, spec_id: str) -> Path:
 
 def guide_path(root: Path, target_id: str) -> Path:
     return object_path(root, "guides", target_id)
+
+
+def draft_slug(draft_id: str) -> str:
+    return sanitize(draft_id)
+
+
+def draft_dir(root: Path, draft_id: str, bucket: str = "open") -> Path:
+    if bucket not in DRAFT_BUCKETS:
+        raise SpecError(f"draft bucket must be one of {list(DRAFT_BUCKETS)}")
+    return root / "drafts" / bucket / draft_slug(draft_id)
+
+
+def draft_file(root: Path, draft_id: str, bucket: str = "open") -> Path:
+    return draft_dir(root, draft_id, bucket) / "draft.yaml"
 
 
 def sanitize(value: str) -> str:
@@ -445,6 +488,195 @@ def write_patch_log(root: Path, patch: dict[str, Any]) -> Path:
     return log_path
 
 
+def now_iso() -> str:
+    return dt.datetime.now().isoformat(timespec="seconds")
+
+
+def safe_relative(path: Path, root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def find_draft(root: Path, draft_id: str, bucket: str | None = None) -> tuple[str, Path]:
+    buckets = (bucket,) if bucket else DRAFT_BUCKETS
+    matches: list[tuple[str, Path]] = []
+    for item in buckets:
+        if item not in DRAFT_BUCKETS:
+            raise SpecError(f"draft bucket must be one of {list(DRAFT_BUCKETS)}")
+        path = draft_file(root, draft_id, item)
+        if path.exists():
+            matches.append((item, path))
+    if not matches:
+        scope = bucket or "any bucket"
+        raise SpecError(f"draft not found in {scope}: {draft_id}")
+    if len(matches) > 1:
+        locations = ", ".join(f"{item}:{path}" for item, path in matches)
+        raise SpecError(f"draft id is ambiguous across buckets: {locations}")
+    return matches[0]
+
+
+def load_draft(root: Path, draft_id: str, bucket: str | None = "open") -> tuple[str, Path, dict[str, Any]]:
+    found_bucket, path = find_draft(root, draft_id, bucket)
+    draft = load_yaml(path)
+    if not isinstance(draft, dict):
+        raise SpecError(f"{path}: draft must be a YAML object")
+    return found_bucket, path, draft
+
+
+def validate_draft_shape(root: Path, bucket: str, path: Path, draft: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    draft_id = draft.get("id")
+    kind = draft.get("kind")
+    status = draft.get("status")
+    if not isinstance(draft_id, str) or not draft_id:
+        errors.append(f"{path}: draft id must be a non-empty string")
+    if kind != "draft":
+        errors.append(f"{path}: draft kind must be 'draft'")
+    if status not in DRAFT_WORKFLOW_STATUSES:
+        errors.append(f"{path}: draft status must be one of {sorted(DRAFT_WORKFLOW_STATUSES)}")
+    elif bucket == "open" and status not in DRAFT_OPEN_STATUSES:
+        errors.append(f"{path}: open drafts must use one of {sorted(DRAFT_OPEN_STATUSES)}")
+    elif bucket in DRAFT_TERMINAL_STATUSES and status != bucket:
+        errors.append(f"{path}: {bucket} drafts must have status '{bucket}'")
+
+    title = draft.get("title")
+    if title is not None and not isinstance(title, str):
+        errors.append(f"{path}: draft title must be a string")
+    for key in ("goals", "non_goals", "questions", "related_specs"):
+        values = draft.get(key, [])
+        if values is None:
+            continue
+        if not isinstance(values, list):
+            errors.append(f"{path}: draft {key} must be a list")
+            continue
+        for value in values:
+            if not isinstance(value, str):
+                errors.append(f"{path}: draft {key} values must be strings")
+
+    candidate_changes = draft.get("candidate_changes", {})
+    if candidate_changes is None:
+        candidate_changes = {}
+    if not isinstance(candidate_changes, dict):
+        errors.append(f"{path}: candidate_changes must be an object")
+    else:
+        patches = candidate_changes.get("patches", [])
+        if patches is None:
+            patches = []
+        if not isinstance(patches, list):
+            errors.append(f"{path}: candidate_changes.patches must be a list")
+        else:
+            for patch_ref in patches:
+                if not isinstance(patch_ref, str) or not patch_ref:
+                    errors.append(f"{path}: candidate_changes.patches values must be non-empty strings")
+
+    related_specs = draft.get("related_specs", []) or []
+    if isinstance(related_specs, list) and related_specs:
+        specs, spec_paths, load_errors = load_current(root)
+        current_errors = load_errors + validate_specs(specs, spec_paths, root)
+        if current_errors:
+            errors.extend(current_errors)
+        else:
+            for spec_id in related_specs:
+                if isinstance(spec_id, str) and spec_id not in specs:
+                    errors.append(f"{path}: related_specs references missing current Spec {spec_id}")
+    return errors
+
+
+def candidate_patch_refs(draft: dict[str, Any]) -> list[str]:
+    candidate_changes = draft.get("candidate_changes") or {}
+    if not isinstance(candidate_changes, dict):
+        return []
+    patches = candidate_changes.get("patches") or []
+    return [patch_ref for patch_ref in patches if isinstance(patch_ref, str) and patch_ref]
+
+
+def resolve_draft_path(draft_root: Path, reference: str) -> Path:
+    relative = Path(reference)
+    if relative.is_absolute():
+        raise SpecError(f"draft candidate patch path must be relative: {reference}")
+    resolved = (draft_root / relative).resolve()
+    draft_resolved = draft_root.resolve()
+    try:
+        resolved.relative_to(draft_resolved)
+    except ValueError as exc:
+        raise SpecError(f"draft candidate patch path escapes draft directory: {reference}") from exc
+    return resolved
+
+
+def load_draft_patches(draft_root: Path, draft: dict[str, Any]) -> list[dict[str, Any]]:
+    patches: list[dict[str, Any]] = []
+    for patch_ref in candidate_patch_refs(draft):
+        patch_path = resolve_draft_path(draft_root, patch_ref)
+        if not patch_path.exists():
+            raise SpecError(f"draft candidate patch not found: {patch_path}")
+        patches.append(load_patch_file(patch_path))
+    return patches
+
+
+def write_text_if_missing(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(content, encoding="utf-8")
+
+
+def append_note(path: Path, heading: str, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    prefix = "\n" if path.exists() and path.read_text(encoding="utf-8").strip() else ""
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(f"{prefix}## {heading}\n\n{text.strip()}\n")
+
+
+def list_field(draft: dict[str, Any], key: str) -> list[Any]:
+    values = draft.setdefault(key, [])
+    if not isinstance(values, list):
+        raise SpecError(f"draft {key} must be a list")
+    return values
+
+
+def add_unique(values: list[Any], additions: list[str] | None) -> None:
+    for value in additions or []:
+        if value not in values:
+            values.append(value)
+
+
+def move_draft(root: Path, draft_id: str, source_bucket: str, target_bucket: str, draft: dict[str, Any]) -> Path:
+    source_dir = draft_dir(root, draft_id, source_bucket)
+    destination_dir = draft_dir(root, draft_id, target_bucket)
+    if destination_dir.exists():
+        raise SpecError(f"target draft directory already exists: {destination_dir}")
+    dump_yaml(source_dir / "draft.yaml", draft)
+    destination_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source_dir), str(destination_dir))
+    return destination_dir
+
+
+def validate_open_drafts(root: Path) -> tuple[int, list[str]]:
+    open_root = root / "drafts" / "open"
+    if not open_root.exists():
+        return 0, []
+    errors: list[str] = []
+    count = 0
+    for path in sorted(open_root.glob("*/draft.yaml")):
+        count += 1
+        try:
+            draft = load_yaml(path)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{path}: cannot parse YAML: {exc}")
+            continue
+        if not isinstance(draft, dict):
+            errors.append(f"{path}: draft must be a YAML object")
+            continue
+        errors.extend(validate_draft_shape(root, "open", path, draft))
+        if draft.get("status") in {"proposed", "validated"} and candidate_patch_refs(draft):
+            try:
+                plan_patch_set(root, load_draft_patches(path.parent, draft))
+            except SpecError as exc:
+                errors.append(f"{path}: candidate patches do not dry-run cleanly: {exc}")
+    return count, errors
+
+
 def example_specs() -> dict[str, dict[str, Any]]:
     return {
         "system.workspace": {
@@ -500,6 +732,7 @@ def command_init(args: argparse.Namespace) -> int:
         readme.write_text(
             "# Spec System\n\n"
             "- `current/` 是 LLM 默认唯一可读的 Current State Snapshot。\n"
+            "- `drafts/` 是非权威 Draft Workspace，用于调研、方案、测试证据和候选 Patch。\n"
             "- `guides/` 是弱语义解释层，默认不进决策 context。\n"
             "- `log/` 是 Patch Log，默认不进 context。\n"
             "- `archive/` 是历史 Snapshot，默认不参与当前决策。\n",
@@ -522,15 +755,20 @@ def command_validate(args: argparse.Namespace) -> int:
     root = Path(args.root)
     specs, spec_paths, load_errors = load_current(root)
     guides, guide_paths, guide_errors = load_guides(root)
+    draft_count, draft_errors = validate_open_drafts(root)
     errors = load_errors + guide_errors
     errors.extend(validate_specs(specs, spec_paths, root))
     errors.extend(validate_guides(guides, guide_paths, specs, root))
+    errors.extend(draft_errors)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
     guide_count = sum(len(items) for items in guides.values())
-    print(f"OK: {len(specs)} current Spec Object(s) and {guide_count} Guide Object(s) validated")
+    print(
+        f"OK: {len(specs)} current Spec Object(s), "
+        f"{guide_count} Guide Object(s), and {draft_count} open Draft(s) validated"
+    )
     return 0
 
 
@@ -578,40 +816,32 @@ def command_read(args: argparse.Namespace) -> int:
     return 0
 
 
-def planned_guides_without(
-    guides: dict[str, list[dict[str, Any]]],
-    guide_paths: dict[str, list[Path]],
-    target: str,
-) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[Path]]]:
-    planned_guides = {key: list(value) for key, value in guides.items() if key != target}
-    planned_paths = {key: list(value) for key, value in guide_paths.items() if key != target}
-    return planned_guides, planned_paths
-
-
-def command_patch(args: argparse.Namespace) -> int:
-    root = Path(args.root)
-    ensure_layout(root)
-    patch_path = Path(args.patch_file)
-    patch = load_yaml(patch_path)
+def load_patch_file(path: Path) -> dict[str, Any]:
+    patch = load_yaml(path)
     if not isinstance(patch, dict):
-        raise SpecError("patch must be a YAML object")
+        raise SpecError(f"{path}: patch must be a YAML object")
+    return patch
+
+
+def patch_operation(patch: dict[str, Any]) -> tuple[str, str]:
     op = patch.get("op")
     target = patch.get("target")
     if op not in {"create", "update", "deprecate"}:
         raise SpecError("patch op must be create, update, or deprecate")
     if not isinstance(target, str) or not target:
         raise SpecError("patch target must be a non-empty string")
+    return op, target
 
-    specs, spec_paths, load_errors = load_current(root)
-    guides, guide_paths, guide_errors = load_guides(root)
-    if load_errors or guide_errors:
-        raise SpecError("; ".join(load_errors + guide_errors))
 
-    new_specs = copy.deepcopy(specs)
-    new_paths = dict(spec_paths)
-    archived_path: Path | None = None
-    written_path: Path | None = None
-    archived_guides: list[Path] = []
+def stage_patch(
+    root: Path,
+    patch: dict[str, Any],
+    specs: dict[str, dict[str, Any]],
+    spec_paths: dict[str, Path],
+    guides: dict[str, list[dict[str, Any]]],
+    guide_paths: dict[str, list[Path]],
+) -> PlannedPatch:
+    op, target = patch_operation(patch)
 
     if op == "create":
         if target in specs:
@@ -621,18 +851,18 @@ def command_patch(args: argparse.Namespace) -> int:
             raise SpecError("create patch requires spec object")
         if spec.get("id") != target:
             raise SpecError("create patch spec.id must equal target")
-        spec.setdefault("version", 1)
-        spec.setdefault("status", "current")
-        new_specs[target] = copy.deepcopy(spec)
-        new_paths[target] = spec_path(root, target)
-        written_path = new_paths[target]
-        planned_guides = guides
-        planned_guide_paths = guide_paths
+        created = copy.deepcopy(spec)
+        created.setdefault("version", 1)
+        created.setdefault("status", "current")
+        specs[target] = created
+        spec_paths[target] = spec_path(root, target)
+        return PlannedPatch(patch=patch, op=op, target=target, written_path=spec_paths[target])
 
-    elif op == "update":
+    if op == "update":
         if target not in specs:
             raise SpecError(f"spec not found: {target}")
-        old_spec = specs[target]
+        old_spec = copy.deepcopy(specs[target])
+        old_path = spec_paths[target]
         check_expected_version(patch, old_spec)
         updated = copy.deepcopy(old_spec)
         apply_changes(updated, patch.get("changes") or {})
@@ -643,53 +873,428 @@ def command_patch(args: argparse.Namespace) -> int:
         updated["kind"] = old_spec.get("kind")
         updated["status"] = "current"
         updated["version"] = old_version + 1
-        new_specs[target] = updated
-        written_path = spec_paths[target]
-        planned_guides = guides
-        planned_guide_paths = guide_paths
+        specs[target] = updated
+        return PlannedPatch(
+            patch=patch,
+            op=op,
+            target=target,
+            written_path=old_path,
+            old_spec=old_spec,
+            old_spec_path=old_path,
+        )
 
-    else:
-        if target not in specs:
-            raise SpecError(f"spec not found: {target}")
-        check_expected_version(patch, specs[target])
-        del new_specs[target]
-        written_path = spec_paths[target]
-        planned_guides, planned_guide_paths = planned_guides_without(guides, guide_paths, target)
+    if target not in specs:
+        raise SpecError(f"spec not found: {target}")
+    old_spec = copy.deepcopy(specs[target])
+    old_path = spec_paths[target]
+    check_expected_version(patch, old_spec)
+    deleted_guides = list(zip(guides.get(target, []), guide_paths.get(target, []), strict=False))
+    del specs[target]
+    del spec_paths[target]
+    guides.pop(target, None)
+    guide_paths.pop(target, None)
+    return PlannedPatch(
+        patch=patch,
+        op=op,
+        target=target,
+        written_path=old_path,
+        old_spec=old_spec,
+        old_spec_path=old_path,
+        deleted_guides=deleted_guides,
+    )
 
-    validation_errors = validate_specs(new_specs, new_paths, root)
-    validation_errors.extend(validate_guides(planned_guides, planned_guide_paths, new_specs, root))
+
+def plan_patch_set(root: Path, patches: list[dict[str, Any]]) -> tuple[list[PlannedPatch], dict[str, dict[str, Any]]]:
+    if not patches:
+        raise SpecError("Patch Set requires at least one patch")
+
+    specs, spec_paths, load_errors = load_current(root)
+    guides, guide_paths, guide_errors = load_guides(root)
+    if load_errors or guide_errors:
+        raise SpecError("; ".join(load_errors + guide_errors))
+
+    staged_specs = copy.deepcopy(specs)
+    staged_paths = dict(spec_paths)
+    staged_guides = copy.deepcopy(guides)
+    staged_guide_paths = {target: list(paths) for target, paths in guide_paths.items()}
+    planned: list[PlannedPatch] = []
+    seen_targets: set[str] = set()
+    for patch in patches:
+        _, target = patch_operation(patch)
+        if target in seen_targets:
+            raise SpecError(f"Patch Set must touch each target at most once; duplicate target: {target}")
+        seen_targets.add(target)
+        planned.append(stage_patch(root, patch, staged_specs, staged_paths, staged_guides, staged_guide_paths))
+
+    validation_errors = validate_specs(staged_specs, staged_paths, root)
+    validation_errors.extend(validate_guides(staged_guides, staged_guide_paths, staged_specs, root))
     if validation_errors:
         raise SpecError("validation failed after patch:\n" + "\n".join(validation_errors))
+    return planned, staged_specs
 
-    if op == "update":
-        archived_path = archive_snapshot(root, specs[target], spec_paths[target])
-        dump_yaml(spec_paths[target], new_specs[target])
-    elif op == "create":
-        dump_yaml(written_path, new_specs[target])
-    else:
-        archived_path = archive_snapshot(root, specs[target], spec_paths[target])
-        spec_paths[target].unlink()
-        for guide, path in zip(guides.get(target, []), guide_paths.get(target, []), strict=False):
-            archived_guides.append(archive_guide(root, guide, path))
-            path.unlink()
 
-    log_path = write_patch_log(root, patch)
-    print(f"applied {op} patch to {target}")
-    if written_path:
-        print(f"current: {written_path}")
-    if archived_path:
-        print(f"archive: {archived_path}")
-    for archived_guide in archived_guides:
-        print(f"guide archive: {archived_guide}")
-    print(f"log: {log_path}")
+def apply_planned_patch_set(
+    root: Path,
+    planned: list[PlannedPatch],
+    staged_specs: dict[str, dict[str, Any]],
+) -> list[PatchResult]:
+    results: list[PatchResult] = []
+    for item in planned:
+        archive_path: Path | None = None
+        guide_archive_paths: list[Path] = []
+
+        if item.op == "create":
+            if item.written_path is None:
+                raise SpecError(f"create patch missing write path: {item.target}")
+            dump_yaml(item.written_path, staged_specs[item.target])
+        elif item.op == "update":
+            if item.old_spec is None or item.old_spec_path is None:
+                raise SpecError(f"update patch missing archive source: {item.target}")
+            archive_path = archive_snapshot(root, item.old_spec, item.old_spec_path)
+            dump_yaml(item.old_spec_path, staged_specs[item.target])
+        else:
+            if item.old_spec is None or item.old_spec_path is None:
+                raise SpecError(f"deprecate patch missing archive source: {item.target}")
+            archive_path = archive_snapshot(root, item.old_spec, item.old_spec_path)
+            item.old_spec_path.unlink()
+            for guide, path in item.deleted_guides:
+                guide_archive_paths.append(archive_guide(root, guide, path))
+                path.unlink()
+
+        log_path = write_patch_log(root, item.patch)
+        results.append(
+            PatchResult(
+                op=item.op,
+                target=item.target,
+                current_path=item.written_path,
+                archive_path=archive_path,
+                log_path=log_path,
+                guide_archive_paths=guide_archive_paths,
+            )
+        )
+    return results
+
+
+def print_patch_results(results: list[PatchResult]) -> None:
+    for result in results:
+        print(f"applied {result.op} patch to {result.target}")
+        if result.current_path:
+            print(f"current: {result.current_path}")
+        if result.archive_path:
+            print(f"archive: {result.archive_path}")
+        for guide_archive in result.guide_archive_paths:
+            print(f"guide archive: {guide_archive}")
+        if result.log_path:
+            print(f"log: {result.log_path}")
+
+
+def command_patch(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    ensure_layout(root)
+    patch = load_patch_file(Path(args.patch_file))
+    planned, staged_specs = plan_patch_set(root, [patch])
+    results = apply_planned_patch_set(root, planned, staged_specs)
+    print_patch_results(results)
+    return 0
+
+
+def command_draft_start(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    ensure_layout(root)
+    path = draft_file(root, args.draft_id, "open")
+    if path.exists():
+        raise SpecError(f"draft already exists: {path}")
+    for bucket in DRAFT_TERMINAL_STATUSES:
+        if draft_file(root, args.draft_id, bucket).exists():
+            raise SpecError(f"draft already exists in {bucket}: {args.draft_id}")
+
+    draft_root = path.parent
+    title = args.title or args.draft_id
+    now = now_iso()
+    draft = {
+        "id": args.draft_id,
+        "kind": "draft",
+        "status": "researching",
+        "title": title,
+        "problem": args.problem or "",
+        "goals": args.goal or [],
+        "non_goals": [],
+        "questions": [],
+        "related_specs": args.related_spec or [],
+        "candidate_changes": {"patches": []},
+        "validation": {
+            "test_plan": "test-plan.md",
+            "evidence": "evidence.md",
+            "commands": [],
+        },
+        "created_at": now,
+        "updated_at": now,
+    }
+    dump_yaml(path, draft)
+    (draft_root / "candidate-patches").mkdir(parents=True, exist_ok=True)
+    write_text_if_missing(
+        draft_root / "research.md",
+        f"# Research: {title}\n\nCapture user interviews, code findings, constraints, and open questions here.\n",
+    )
+    write_text_if_missing(
+        draft_root / "analysis.md",
+        f"# Analysis: {title}\n\nCompare options, risks, compatibility concerns, and affected Specs here.\n",
+    )
+    write_text_if_missing(
+        draft_root / "test-plan.md",
+        f"# Test Plan: {title}\n\nList validation scenarios and commands before accepting the draft.\n",
+    )
+    write_text_if_missing(
+        draft_root / "evidence.md",
+        f"# Evidence: {title}\n\nRecord test results, links, logs, screenshots, and review notes here.\n",
+    )
+    write_text_if_missing(
+        draft_root / "candidate-patches" / "README.md",
+        "# Candidate Patches\n\nPlace YAML Spec Patch files here and list them in `draft.yaml` under `candidate_changes.patches`.\n",
+    )
+    print(f"created draft: {path}")
+    print(f"workspace: {draft_root}")
+    return 0
+
+
+def command_draft_list(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    buckets = DRAFT_BUCKETS if args.all else ("open",)
+    rows: list[tuple[str, str, str, str]] = []
+    for bucket in buckets:
+        bucket_root = root / "drafts" / bucket
+        if not bucket_root.exists():
+            continue
+        for path in sorted(bucket_root.glob("*/draft.yaml")):
+            draft = load_yaml(path)
+            if not isinstance(draft, dict):
+                continue
+            rows.append((bucket, str(draft.get("id", path.parent.name)), str(draft.get("status", "")), str(draft.get("title", ""))))
+    if not rows:
+        print("no drafts found")
+        return 0
+    for bucket, draft_id, status, title in rows:
+        print(f"{bucket}\t{status}\t{draft_id}\t{title}")
+    return 0
+
+
+def command_draft_research(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft_root = path.parent
+    add_unique(list_field(draft, "questions"), args.question)
+    add_unique(list_field(draft, "related_specs"), args.related_spec)
+    if args.problem:
+        draft["problem"] = args.problem
+    if args.note:
+        append_note(draft_root / "research.md", now_iso(), args.note)
+    draft["status"] = "researching"
+    draft["updated_at"] = now_iso()
+    dump_yaml(path, draft)
+    print(f"updated draft research: {path}")
+    if args.note:
+        print(f"research: {draft_root / 'research.md'}")
+    return 0
+
+
+def command_draft_propose(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft_root = path.parent
+    for patch_ref in args.patch_ref or []:
+        patch_path = resolve_draft_path(draft_root, patch_ref)
+        if not patch_path.exists():
+            raise SpecError(f"candidate patch file does not exist: {patch_path}")
+        load_patch_file(patch_path)
+    if args.note:
+        append_note(draft_root / "analysis.md", now_iso(), args.note)
+    candidate_changes = draft.setdefault("candidate_changes", {})
+    if not isinstance(candidate_changes, dict):
+        raise SpecError("candidate_changes must be an object")
+    patches = candidate_changes.setdefault("patches", [])
+    if not isinstance(patches, list):
+        raise SpecError("candidate_changes.patches must be a list")
+    add_unique(patches, args.patch_ref)
+    draft["status"] = "proposed" if patches else "researching"
+    draft["updated_at"] = now_iso()
+    dump_yaml(path, draft)
+    print(f"updated draft proposal: {path}")
+    if args.note:
+        print(f"analysis: {draft_root / 'analysis.md'}")
+    return 0
+
+
+def command_draft_show(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, args.bucket)
+    errors = validate_draft_shape(root, bucket, path, draft)
+    output = {"bucket": bucket, "path": str(path), "draft": draft}
+    if errors:
+        output["errors"] = errors
+    print(yaml.safe_dump(output, allow_unicode=True, sort_keys=False).strip())
+    return 1 if errors else 0
+
+
+def command_draft_validate(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, args.bucket)
+    draft_root = path.parent
+    errors = validate_draft_shape(root, bucket, path, draft)
+    patches: list[dict[str, Any]] = []
+    if not errors:
+        try:
+            patches = load_draft_patches(draft_root, draft)
+            if args.require_patches and not patches:
+                errors.append(f"{path}: draft must list at least one candidate patch")
+            if patches:
+                plan_patch_set(root, patches)
+        except SpecError as exc:
+            errors.append(str(exc))
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    print(f"OK: draft {args.draft_id} validated with {len(patches)} candidate patch(es)")
+    if bucket == "open" and draft.get("status") != "validated" and patches:
+        draft["status"] = "validated"
+        draft["updated_at"] = now_iso()
+        dump_yaml(path, draft)
+        print(f"status: validated ({path})")
+    return 0
+
+
+def command_draft_test(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft_root = path.parent
+    validation = draft.setdefault("validation", {})
+    if not isinstance(validation, dict):
+        raise SpecError("draft validation must be an object")
+    commands = validation.setdefault("commands", [])
+    if not isinstance(commands, list):
+        raise SpecError("draft validation.commands must be a list")
+    add_unique(commands, args.command)
+    if args.plan:
+        append_note(draft_root / str(validation.get("test_plan", "test-plan.md")), now_iso(), args.plan)
+    if args.evidence:
+        append_note(draft_root / str(validation.get("evidence", "evidence.md")), now_iso(), args.evidence)
+    draft["updated_at"] = now_iso()
+    dump_yaml(path, draft)
+    print(f"updated draft validation notes: {path}")
+    return 0
+
+
+def command_draft_accept(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    ensure_layout(root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    draft_root = path.parent
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    patches = load_draft_patches(draft_root, draft)
+    if not patches:
+        raise SpecError("accepted draft must list at least one candidate patch")
+    planned, staged_specs = plan_patch_set(root, patches)
+    if args.dry_run:
+        print(f"OK: draft {args.draft_id} can be accepted with {len(patches)} candidate patch(es)")
+        return 0
+
+    results = apply_planned_patch_set(root, planned, staged_specs)
+    draft["status"] = "accepted"
+    draft["accepted_at"] = now_iso()
+    draft["updated_at"] = draft["accepted_at"]
+    draft["applied_patches"] = [
+        {
+            "target": result.target,
+            "op": result.op,
+            "log": safe_relative(result.log_path, root) if result.log_path else None,
+            "current": safe_relative(result.current_path, root) if result.current_path else None,
+            "archive": safe_relative(result.archive_path, root) if result.archive_path else None,
+        }
+        for result in results
+    ]
+    accepted_dir = move_draft(root, args.draft_id, "open", "accepted", draft)
+    print_patch_results(results)
+    print(f"draft accepted: {accepted_dir / 'draft.yaml'}")
+    return 0
+
+
+def command_draft_reject(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft["status"] = "rejected"
+    draft["rejected_at"] = now_iso()
+    draft["updated_at"] = draft["rejected_at"]
+    if args.reason:
+        draft["rejection_reason"] = args.reason
+    rejected_dir = move_draft(root, args.draft_id, "open", "rejected", draft)
+    print(f"draft rejected: {rejected_dir / 'draft.yaml'}")
+    return 0
+
+
+def command_draft_supersede(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft["status"] = "superseded"
+    draft["superseded_at"] = now_iso()
+    draft["updated_at"] = draft["superseded_at"]
+    if args.by:
+        draft["superseded_by"] = args.by
+    if args.reason:
+        draft["supersede_reason"] = args.reason
+    superseded_dir = move_draft(root, args.draft_id, "open", "superseded", draft)
+    print(f"draft superseded: {superseded_dir / 'draft.yaml'}")
+    return 0
+
+
+def command_draft_add_patch(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    bucket, path, draft = load_draft(root, args.draft_id, "open")
+    errors = validate_draft_shape(root, bucket, path, draft)
+    if errors:
+        raise SpecError("draft validation failed:\n" + "\n".join(errors))
+    draft_root = path.parent
+    patch_path = resolve_draft_path(draft_root, args.patch_ref)
+    if not patch_path.exists():
+        raise SpecError(f"candidate patch file does not exist: {patch_path}")
+    load_patch_file(patch_path)
+    candidate_changes = draft.setdefault("candidate_changes", {})
+    if not isinstance(candidate_changes, dict):
+        raise SpecError("candidate_changes must be an object")
+    patches = candidate_changes.setdefault("patches", [])
+    if not isinstance(patches, list):
+        raise SpecError("candidate_changes.patches must be a list")
+    if args.patch_ref not in patches:
+        patches.append(args.patch_ref)
+    draft["status"] = "proposed"
+    draft["updated_at"] = now_iso()
+    dump_yaml(path, draft)
+    print(f"added candidate patch: {args.patch_ref}")
+    print(f"draft: {path}")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Maintain a Snapshot + Patch + Guide Spec System")
+    parser = argparse.ArgumentParser(description="Maintain a Snapshot + Draft + Patch + Guide Spec System")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="create omni-coding/specs/current, guides, log, and archive")
+    init_parser = subparsers.add_parser("init", help="create omni-coding/specs/current, guides, drafts, log, and archive")
     init_parser.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
     init_parser.add_argument("--with-examples", action="store_true", help="write minimal example Spec and Guide Objects")
     init_parser.set_defaults(func=command_init)
@@ -709,6 +1314,85 @@ def build_parser() -> argparse.ArgumentParser:
     patch_parser.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
     patch_parser.add_argument("patch_file", help="YAML patch file")
     patch_parser.set_defaults(func=command_patch)
+
+    draft_parser = subparsers.add_parser("draft", help="manage non-authoritative feature Draft workspaces")
+    draft_subparsers = draft_parser.add_subparsers(dest="draft_command", required=True)
+
+    draft_start = draft_subparsers.add_parser("start", help="create an open feature Draft workspace")
+    draft_start.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_start.add_argument("draft_id", help="Draft id, for example draft.feature.search-v2")
+    draft_start.add_argument("--title", help="Human-readable Draft title")
+    draft_start.add_argument("--problem", help="Problem statement for the Draft")
+    draft_start.add_argument("--goal", action="append", help="Goal to add; may be repeated")
+    draft_start.add_argument("--related-spec", action="append", help="Current Spec id related to this Draft; may be repeated")
+    draft_start.set_defaults(func=command_draft_start)
+
+    draft_list = draft_subparsers.add_parser("list", help="list Draft workspaces")
+    draft_list.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_list.add_argument("--all", action="store_true", help="include accepted, rejected, and superseded Drafts")
+    draft_list.set_defaults(func=command_draft_list)
+
+    draft_research = draft_subparsers.add_parser("research", help="record research notes and open questions for an open Draft")
+    draft_research.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_research.add_argument("draft_id", help="Draft id")
+    draft_research.add_argument("--problem", help="Replace the Draft problem statement")
+    draft_research.add_argument("--question", action="append", help="Question to add; may be repeated")
+    draft_research.add_argument("--related-spec", action="append", help="Related current Spec id to add; may be repeated")
+    draft_research.add_argument("--note", help="Research note to append to research.md")
+    draft_research.set_defaults(func=command_draft_research)
+
+    draft_propose = draft_subparsers.add_parser("propose", help="record proposal analysis and candidate patch references")
+    draft_propose.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_propose.add_argument("draft_id", help="Draft id")
+    draft_propose.add_argument("patch_ref", nargs="*", help="Patch path relative to the Draft workspace")
+    draft_propose.add_argument("--note", help="Proposal analysis note to append to analysis.md")
+    draft_propose.set_defaults(func=command_draft_propose)
+
+    draft_show = draft_subparsers.add_parser("show", help="print Draft metadata")
+    draft_show.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_show.add_argument("draft_id", help="Draft id")
+    draft_show.add_argument("--bucket", choices=DRAFT_BUCKETS, help="Draft bucket; defaults to searching all buckets")
+    draft_show.set_defaults(func=command_draft_show)
+
+    draft_add_patch = draft_subparsers.add_parser("add-patch", help="add a candidate patch reference to an open Draft")
+    draft_add_patch.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_add_patch.add_argument("draft_id", help="Draft id")
+    draft_add_patch.add_argument("patch_ref", help="Patch path relative to the Draft workspace")
+    draft_add_patch.set_defaults(func=command_draft_add_patch)
+
+    draft_validate = draft_subparsers.add_parser("validate", help="validate Draft metadata and dry-run candidate patches")
+    draft_validate.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_validate.add_argument("draft_id", help="Draft id")
+    draft_validate.add_argument("--bucket", choices=DRAFT_BUCKETS, default="open", help="Draft bucket to validate")
+    draft_validate.add_argument("--require-patches", action="store_true", help="fail if the Draft has no candidate patches")
+    draft_validate.set_defaults(func=command_draft_validate)
+
+    draft_test = draft_subparsers.add_parser("test", help="record test plan, commands, and evidence for an open Draft")
+    draft_test.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_test.add_argument("draft_id", help="Draft id")
+    draft_test.add_argument("--command", action="append", help="Validation command to record; may be repeated")
+    draft_test.add_argument("--plan", help="Test-plan note to append to test-plan.md")
+    draft_test.add_argument("--evidence", help="Evidence note to append to evidence.md")
+    draft_test.set_defaults(func=command_draft_test)
+
+    draft_accept = draft_subparsers.add_parser("accept", help="promote an open Draft by applying candidate patches")
+    draft_accept.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_accept.add_argument("draft_id", help="Draft id")
+    draft_accept.add_argument("--dry-run", action="store_true", help="validate promotion without writing current/log/archive")
+    draft_accept.set_defaults(func=command_draft_accept)
+
+    draft_reject = draft_subparsers.add_parser("reject", help="move an open Draft to rejected without changing current")
+    draft_reject.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_reject.add_argument("draft_id", help="Draft id")
+    draft_reject.add_argument("--reason", help="Reason for rejecting the Draft")
+    draft_reject.set_defaults(func=command_draft_reject)
+
+    draft_supersede = draft_subparsers.add_parser("supersede", help="move an open Draft to superseded without changing current")
+    draft_supersede.add_argument("root", help="Spec root directory, usually ./omni-coding/specs")
+    draft_supersede.add_argument("draft_id", help="Draft id")
+    draft_supersede.add_argument("--by", help="Replacement Draft id")
+    draft_supersede.add_argument("--reason", help="Reason for superseding the Draft")
+    draft_supersede.set_defaults(func=command_draft_supersede)
 
     return parser
 

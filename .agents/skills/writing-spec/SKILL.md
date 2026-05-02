@@ -1,6 +1,6 @@
 ---
 name: writing-spec
-description: Use when asked to design, create, or maintain a Spec System for an AI Coding project, including spec coding, specifications, source of truth, current specs, Snapshots, Patches, Spec Evolution, Spec Graphs, structured Specs, Capability Specs, Contract Specs, Guides, semantics, strong or weak semantics, design principles, SOLID, KISS, DRY, Separation of Concerns, Least Privilege, LLM context pollution, archive/log separation, or turning project rules into one valid Spec truth. Also use when reviewing existing specs for multiple current truths, narrative-doc pollution, mixed Spec and Guide content, Patch Log replay, stale specs entering LLM context, or unclear Spec boundaries.
+description: Use when asked to design, create, draft, research, validate, or maintain a Spec System for an AI Coding project, including spec coding, feature drafts, new feature discovery, requirements research, candidate patches, test plans, source of truth, current specs, Snapshots, Patches, Spec Evolution, Spec Graphs, structured Specs, Capability Specs, Contract Specs, Guides, semantics, strong or weak semantics, design principles, SOLID, KISS, DRY, Separation of Concerns, Least Privilege, LLM context pollution, archive/log separation, or turning project rules into one valid Spec truth. Also use when reviewing existing specs or drafts for multiple current truths, narrative-doc pollution, mixed Spec and Guide content, Patch Log replay, stale specs entering LLM context, unclear Spec boundaries, unpromoted Drafts, or candidate Patch conflicts.
 ---
 
 # Writing Spec
@@ -15,6 +15,13 @@ description: Use when asked to design, create, or maintain a Spec System for an 
 - If the user's request is in Chinese or another language, respond in that same language and write specs, plans, task cards, reviews, and other generated artifacts in that language.
 - If the user explicitly requests a language, or the surrounding context specifies a language, use that language instead of inferring the language from the request.
 
+## Code Writing Boundary
+
+- Do not write, modify, patch, or generate production code, test code, scripts, or other source files unless the user explicitly asks for direct code implementation or code edits.
+- When the user asks only for Spec work, produce Spec artifacts, analysis, candidate Spec Patches, validation notes, or review feedback without changing source code.
+- It is acceptable to reference code paths, describe interfaces, or include clearly labeled illustrative pseudocode when needed for Spec clarity, but do not apply code changes without explicit user confirmation.
+- If implementation would be useful but the user did not ask for coding, ask for confirmation before writing code.
+
 ## 核心模型
 
 默认采用这个 target model：
@@ -22,6 +29,7 @@ description: Use when asked to design, create, or maintain a Spec System for an 
 ```text
 Spec System =
   Current State Snapshot   # 强语义，LLM 默认只读这里
++ Draft Workspace          # 非权威，新功能调研/方案/测试/候选 Patch
 + Guide Layer              # 弱语义，按需解释，不参与默认决策
 + Patch Log                # 系统写入历史，不进默认 context
 + Archive                  # 旧 Snapshot，弱索引，不参与当前决策
@@ -30,9 +38,11 @@ Spec System =
 
 Hard rules：
 - `omni-coding/specs/current/` 是唯一有效 Spec。任何时刻，LLM 读到的 Spec 必须是当前唯一正确版本。
+- `omni-coding/specs/drafts/` 是非权威 Draft Workspace，用于新功能调研、用户对齐、测试计划、验证证据和候选 Patch；默认不作为当前事实。
 - `omni-coding/specs/guides/` 是弱语义 Guide，只能辅助理解，不参与默认决策。
 - `omni-coding/specs/log/` 和 `omni-coding/specs/archive/` 默认绝不注入 context，除非用户明确要求历史分析。
 - LLM 永远不要 replay Patch Log。Patch 是写入路径，Snapshot 是读取路径。
+- Draft 不得直接改变 `current/`。只有用户确认 accept/promote 后，候选 Patch 才能经过 Spec Compiler 写入 `current/`。
 - 不允许多个 current truth，例如 `api.md`、`api_v2.md`、`api_final.md`。
 - 不允许把 Spec 写成 narrative doc。Spec Object 必须结构化、可 diff、可局部更新。
 - 不要把 `Spec` 和 `Guide/Tips/Rationale` 混在一起。建议、背景、推理、examples 放在 Guide，或者放在 `current/` 之外。
@@ -48,6 +58,11 @@ omni-coding/
 │   │   ├── capability/
 │   │   ├── system/
 │   │   └── contract/
+│   ├── drafts/
+│   │   ├── open/
+│   │   ├── accepted/
+│   │   ├── rejected/
+│   │   └── superseded/
 │   ├── guides/
 │   │   ├── capability/
 │   │   ├── system/
@@ -60,6 +75,8 @@ omni-coding/
 
 Rules：
 - `current/` 只放已经 compile 后的最终态 Snapshot，也就是强语义 Spec。
+- `drafts/open/` 放正在调研的新功能 Draft，允许 narrative、analysis、test notes 和候选 Patch，但不参与默认决策。
+- `drafts/accepted/`、`drafts/rejected/`、`drafts/superseded/` 是历史 Draft 归档，默认不注入 context。
 - `guides/` 只放弱语义 Guide，用于 debug、onboarding、理解背景，默认不作为决策输入。
 - `log/` 只放 Spec Patch 历史，不作为 LLM 推理输入。
 - `archive/` 只放旧 Snapshot 或 deprecated Spec，不作为当前事实。
@@ -175,6 +192,75 @@ Guide rules：
 - Guide 默认不注入 LLM context；只有 debug、onboarding、理解背景时按需加载。
 - 如果 Guide 和 Spec 冲突，以 Spec 为准，并生成 Patch 修正其中一个。
 
+## Draft Workspace
+
+Draft 是新功能落入正式 Spec 前的协作工作区。它解决“还没调研清楚，但需要和用户一起收敛”的阶段：需求澄清、方案比较、测试计划、验证证据和候选 Spec Patch。
+
+Draft 不是 Spec truth：
+- `drafts/open/` 允许 narrative、research、rationale、test notes、evidence 和多个候选 Patch。
+- Draft 中的判断默认不能作为实现依据，除非用户明确要求围绕该 Draft 工作。
+- Draft 不得直接改 `current/`；只允许通过 `candidate-patches/` 生成正式 Patch。
+- `draft accept` / promote 必须先 dry-run 所有 candidate patches，再统一 compile 到 `current/`。
+- 如果 Draft、Guide、Archive 或 Log 和 `current/` 冲突，以 `current/` 为准。
+
+推荐 Draft workspace：
+
+```text
+omni-coding/specs/drafts/open/draft.feature.search-v2/
+├── draft.yaml
+├── research.md
+├── analysis.md
+├── test-plan.md
+├── evidence.md
+└── candidate-patches/
+    ├── README.md
+    ├── 0001.update.contract.search.patch.yaml
+    └── 0002.update.capability.search.patch.yaml
+```
+
+Draft Object 推荐格式：
+
+```yaml
+id: draft.feature.search-v2
+kind: draft
+status: researching
+title: Search V2
+problem: 当前搜索能力不支持多字段过滤
+goals:
+  - support_multi_field_filtering
+non_goals:
+  - replace_existing_indexer
+questions:
+  - 是否需要兼容旧 query syntax？
+related_specs:
+  - capability.search.query
+  - contract.api.search
+candidate_changes:
+  patches:
+    - candidate-patches/0001.update.contract.search.patch.yaml
+    - candidate-patches/0002.update.capability.search.patch.yaml
+validation:
+  test_plan: test-plan.md
+  evidence: evidence.md
+  commands:
+    - npm test -- search
+```
+
+Draft statuses：
+- `researching`: 正在调研和澄清，不要求已有 candidate patches。
+- `proposed`: 已有候选 Patch，但还没有完成验证。
+- `validated`: candidate patches dry-run 通过，测试计划和证据可供用户确认。
+- `accepted`: 用户确认后，candidate patches 已 compile 到 `current/`。
+- `rejected`: 用户确认不采纳，保留调研记录。
+- `superseded`: 被另一个 Draft 取代。
+
+Draft rules：
+- 新功能、需求不清、需要测试开发或用户调研时，默认先创建 Draft，不要直接写 Spec Patch。
+- 小型、明确、无争议的 Spec 修正可以直接 Patch，不必强制 Draft。
+- Draft 的 `related_specs` 必须引用现有 `current/` Spec；如果缺失，先说明需要创建或拆分哪些 Spec。
+- Candidate Patch 必须仍遵守正式 Patch 规则：`create` 提供完整 `spec`，`update` 只写 `changes`，`deprecate` 归档旧对象。
+- Draft 被 accept 前，不要声称 Spec 已更新；只能说“Draft 已创建/已验证/可提交确认”。
+
 ## Design Principles References
 
 当任务涉及 Spec 边界、Capability 拆分、Contract 兼容、权限 scope、Graph 关系或 abstraction 选择时，按需读取 `references/principles/` 中的英文 Principle 文件。不要一次性全部加载；只加载能影响当前 design decision 的 Principle。
@@ -203,6 +289,24 @@ Guide rules：
 - 如果 Principle 和 current Spec 冲突，先生成 Spec Patch，不要直接按 Principle 改代码。
 
 ## 默认 Workflow
+
+### 0. 判断是否需要 Draft
+
+先判断用户请求属于哪类：
+- 新功能、需求不清、需要用户调研、需要方案比较、需要测试开发或存在多种演进路线：先走 Draft Workflow。
+- 明确的小型 Spec 修正、已知 bug 对应的约束修正、用户明确要求直接更新 Spec：可以直接生成 Spec Patch。
+- 用户只是要解释、review 或一次性建议：不要落地 Draft 或 Spec，除非用户确认。
+
+Draft Workflow：
+1. `draft start`: 创建 `drafts/open/<draft-id>/`，记录 problem、goals、questions、related_specs。
+2. `draft research`: 读取相关 `current/` Spec、必要 Guide、代码和测试，写入 `research.md` 和 `analysis.md`。
+3. `draft propose`: 在 `candidate-patches/` 中生成一个或多个正式 Spec Patch，并写入 `draft.yaml` 的 `candidate_changes.patches`。
+4. `draft validate`: dry-run 所有 candidate patches，检查是否能 compile、relations 是否完整、是否存在 narrative pollution。
+5. `draft test`: 把测试计划写入 `test-plan.md`，把执行结果和证据写入 `evidence.md`。
+6. 用户确认后 `draft accept`: 事务性应用 candidate patches，写回 `current/`、`log/`、`archive/`，并移动到 `drafts/accepted/`。
+7. 用户不采纳时 `draft reject`；被其他 Draft 替代时 `draft supersede`。
+
+Draft 阶段的输出必须明确状态：`researching`、`proposed`、`validated`、`accepted`、`rejected` 或 `superseded`。
 
 ### 1. 先读取 Current Snapshot
 
@@ -271,6 +375,14 @@ python3 scripts/spec_store.py validate ./omni-coding/specs
 python3 scripts/spec_store.py read ./omni-coding/specs capability.file.write --with-deps
 python3 scripts/spec_store.py read ./omni-coding/specs capability.file.write --with-deps --with-guide
 python3 scripts/spec_store.py patch ./omni-coding/specs ./patch.yaml
+python3 scripts/spec_store.py draft start ./omni-coding/specs draft.feature.search-v2 --title "Search V2"
+python3 scripts/spec_store.py draft research ./omni-coding/specs draft.feature.search-v2 --question "Need legacy syntax?" --note "User needs multi-field filters."
+python3 scripts/spec_store.py draft propose ./omni-coding/specs draft.feature.search-v2 candidate-patches/0001.update.contract.search.patch.yaml --note "Use backward-compatible query extension."
+python3 scripts/spec_store.py draft test ./omni-coding/specs draft.feature.search-v2 --command "npm test -- search" --evidence "Search tests passed."
+python3 scripts/spec_store.py draft validate ./omni-coding/specs draft.feature.search-v2 --require-patches
+python3 scripts/spec_store.py draft accept ./omni-coding/specs draft.feature.search-v2 --dry-run
+python3 scripts/spec_store.py draft accept ./omni-coding/specs draft.feature.search-v2
+python3 scripts/spec_store.py draft reject ./omni-coding/specs draft.feature.search-v2 --reason "out of scope"
 ```
 
 如果脚本不在目标 repo，可以从本 skill 复制进去，或直接用同等流程手动执行；但原则不能变：LLM 只读 Snapshot，系统只通过 Patch 写入。
@@ -286,10 +398,11 @@ Query → spec_id → current/spec_id → relations → minimal current subset
 强制规则：
 - 默认只注入 `current/` 的相关子集。
 - 不要 `load all specs`，除非项目极小且用户明确要求。
-- 不要默认注入 `guides/`、`archive/` 或 `log/`。
+- 不要默认注入 `drafts/`、`guides/`、`archive/` 或 `log/`。
+- 只有用户正在处理某个 Draft，或明确要求查看 Draft 时，才加载对应 `drafts/open/<draft-id>/`；不要加载所有 Draft。
 - `guides/` 只能辅助理解，不能覆盖 Current Spec 的决策权。
 - 不允许基于 archived Spec 做当前设计或代码决策。
-- 如果 Guide、历史信息和 current 冲突，以 current 为准，并说明非 current 内容仅供分析。
+- 如果 Draft、Guide、历史信息和 current 冲突，以 current 为准，并说明非 current 内容仅供分析。
 
 ## Conflict 和 Consistency
 
@@ -301,6 +414,8 @@ Query → spec_id → current/spec_id → relations → minimal current subset
 - `current/` 是否含有 narrative 字段或无法验证的 pseudo-constraints。
 - 新 constraints 是否和依赖 Spec 的 invariants 冲突。
 - Contract 变化是否需要对应 Capability 或 System Spec 同步。
+- Draft 的 candidate patches 是否能作为 Patch Set 一次性 dry-run 通过。
+- Draft accept 是否已经获得用户确认，是否有测试计划和验证证据。
 
 如果发现冲突：
 - 不要 silence merge。
@@ -320,6 +435,8 @@ Query → spec_id → current/spec_id → relations → minimal current subset
 
 完成 Spec 相关操作后，至少说明：
 - 读取了哪些 current Spec Object。
+- 是否创建、验证、接受、拒绝或 supersede 了哪些 Draft。
+- Draft 仍未 accepted 时，明确说明它还不是 current truth。
 - 生成或应用了哪些 Patch。
 - 更新了哪些 `omni-coding/specs/current/` 文件。
 - 是否写入了 `omni-coding/specs/log/` 和 `omni-coding/specs/archive/`。
