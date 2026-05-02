@@ -61,6 +61,7 @@ pub enum PrimitiveEndpointKind {
     Files,
     Caches,
     Models,
+    Operations,
     Live,
     Rerank,
     Custom,
@@ -94,6 +95,8 @@ pub enum ProviderPrimitiveWireFormat {
     GeminiLive,
     GeminiFiles,
     GeminiCaches,
+    GeminiModels,
+    GeminiOperations,
     BedrockConverse,
     BedrockInvokeModel,
     OpenAiCompatibleChatCompletions,
@@ -703,6 +706,18 @@ pub fn embedded_primitive_provider_registry() -> PrimitiveProviderRegistry {
                         &[ProviderPrimitiveWireFormat::GeminiCaches],
                         &[PrimitiveStreamMode::None],
                     ),
+                    support(
+                        PrimitiveEndpointKind::Models,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::GeminiModels],
+                        &[PrimitiveStreamMode::None],
+                    ),
+                    support(
+                        PrimitiveEndpointKind::Operations,
+                        SupportLevel::Native,
+                        &[ProviderPrimitiveWireFormat::GeminiOperations],
+                        &[PrimitiveStreamMode::None],
+                    ),
                 ],
             },
             PrimitiveProviderDescriptor {
@@ -928,6 +943,7 @@ fn infer_scope_tier(
         endpoint,
         PrimitiveEndpointKind::Files
             | PrimitiveEndpointKind::Models
+            | PrimitiveEndpointKind::Operations
             | PrimitiveEndpointKind::Caches
             | PrimitiveEndpointKind::Uploads
     ) {
@@ -952,7 +968,12 @@ fn infer_budget_class(
     endpoint: PrimitiveEndpointKind,
     wire_formats: &[ProviderPrimitiveWireFormat],
 ) -> PrimitiveBudgetClass {
-    if matches!(endpoint, PrimitiveEndpointKind::Models) {
+    if matches!(
+        endpoint,
+        PrimitiveEndpointKind::Models
+            | PrimitiveEndpointKind::Operations
+            | PrimitiveEndpointKind::Caches
+    ) {
         return PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost;
     }
 
@@ -1049,6 +1070,8 @@ fn default_path(request: &PrimitiveRequest) -> Option<String> {
         ProviderPrimitiveWireFormat::GeminiLive => None,
         ProviderPrimitiveWireFormat::GeminiFiles => Some("/files".into()),
         ProviderPrimitiveWireFormat::GeminiCaches => Some("/cachedContents".into()),
+        ProviderPrimitiveWireFormat::GeminiModels => Some("/models".into()),
+        ProviderPrimitiveWireFormat::GeminiOperations => Some("/operations".into()),
         ProviderPrimitiveWireFormat::BedrockConverse
         | ProviderPrimitiveWireFormat::BedrockInvokeModel
         | ProviderPrimitiveWireFormat::CustomHttp => None,

@@ -16,7 +16,6 @@ Plans:
 - No active tasks.
 
 ## Todo
-- `task-primitive-provider-scope-004`: Implement P1 Gemini metadata operations and file gaps
 - `task-primitive-provider-scope-005`: Sync P1 primitive support docs and examples
 - `task-primitive-provider-scope-006`: Define primitive async job lifecycle
 - `task-primitive-provider-scope-007`: Implement P2 batch lifecycle providers
@@ -28,6 +27,7 @@ Plans:
 - No blocked tasks.
 
 ## Done
+- `task-primitive-provider-scope-004`: Implement P1 Gemini metadata operations and file gaps
 - `task-primitive-provider-scope-003`: Implement P1 Anthropic metadata and files gaps
 - `task-primitive-provider-scope-002`: Implement P1 OpenAI primitive HTTP gaps
 - `task-primitive-provider-scope-001`: Add primitive scope guardrails and registry vocabulary

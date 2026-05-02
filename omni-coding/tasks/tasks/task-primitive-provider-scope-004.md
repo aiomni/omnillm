@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-004
 title: Implement P1 Gemini metadata operations and file gaps
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, gemini, http]
 project: primitive-provider-scope-expansion
@@ -22,11 +22,11 @@ Gemini primitive support covers generate, stream, count tokens, embeddings, file
 - Keep Gemini API key auth, raw payloads, and usage metadata handling provider-native.
 
 # Execution Steps
-- [ ] Add Gemini Models registry/path coverage.
-- [ ] Add read-only Operations path coverage for get/list where applicable.
-- [ ] Audit Gemini Files and Caches default path resolution and explicit path behavior.
-- [ ] Add auth/query/header tests for Gemini and Vertex-compatible endpoint forms.
-- [ ] Add budget tests for zero-cost metadata and cache/file operations.
+- [x] Add Gemini Models registry/path coverage.
+- [x] Add read-only Operations path coverage for get/list where applicable.
+- [x] Audit Gemini Files and Caches default path resolution and explicit path behavior.
+- [x] Add auth/query/header tests for Gemini and Vertex-compatible endpoint forms.
+- [x] Add budget tests for zero-cost metadata and cache/file operations.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -45,10 +45,15 @@ Gemini primitive support covers generate, stream, count tokens, embeddings, file
 - Recommended action: implement read-only Operations narrowly before adding batch create flows.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Added Gemini Models and Operations primitive wire formats, registry support, and default paths.
+- Added Files and Caches explicit path budget tests plus Gemini auth assertions.
+- Validation: `cargo fmt` and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; Gemini P1 metadata, operations, files, and caches acceptance criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source spec tier: `support_tiers.p1_low_risk_http_gaps.Gemini`.

@@ -23,7 +23,7 @@
 - Done: scope guardrails and registry vocabulary hardening.
 - Done: P1 OpenAI low-risk HTTP gaps.
 - Done: P1 Anthropic metadata/files hardening.
-- Todo: P1 Gemini metadata/operations/files/caches hardening.
+- Done: P1 Gemini metadata/operations/files/caches hardening.
 - Todo: P1 docs/examples/support matrix sync.
 - Todo: P2 primitive async job lifecycle design and runtime shape.
 - Todo: P2 cross-provider batch lifecycle implementation.

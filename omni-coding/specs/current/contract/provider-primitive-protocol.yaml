@@ -88,6 +88,7 @@ primitive_types:
       - Files
       - Caches
       - Models
+      - Operations
       - Live
       - Rerank
       - Custom
@@ -118,6 +119,8 @@ primitive_types:
       - GeminiLive
       - GeminiFiles
       - GeminiCaches
+      - GeminiModels
+      - GeminiOperations
       - BedrockConverse
       - BedrockInvokeModel
       - OpenAiCompatibleChatCompletions
@@ -219,6 +222,7 @@ provider_api_families:
       - Batches
       - Images
       - Models
+      - OperationsReadOnly
     required_features:
       - generate_content
       - stream_generate_content
