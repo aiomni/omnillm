@@ -70,7 +70,7 @@ The documentation site source lives in the GitHub repository:
 - Replay fixture sanitization helpers for safe record/replay style testing
 - Multi-key load balancing with per-key rate limiting and circuit breaking
 - Lock-free budget tracking with pre-reserve + settle accounting
-- Non-streaming `call`, canonical streaming `stream`, primitive `primitive_call`, and primitive SSE `primitive_stream` APIs
+- Non-streaming `call`, canonical streaming `stream`, primitive `primitive_call`, primitive SSE/binary `primitive_stream`, and primitive WebSocket `primitive_realtime` APIs
 - Bundled OmniLLM Skill in `skill/` for AI-native repo guidance
 
 ## Dual Protocol Modes
@@ -80,7 +80,7 @@ OmniLLM now exposes two runtime protocol forms:
 | Mode | Entry points | Payload model | Use when | Budget |
 | --- | --- | --- | --- | --- |
 | OpenAI Responses canonical | `Gateway::call`, `Gateway::stream` | `LlmRequest`, `LlmResponse`, `LlmStreamEvent` | You want provider-neutral generation with existing OpenAI Responses-centered semantics and provider transcoding | Shared `BudgetTracker` |
-| Provider primitive | `Gateway::primitive_call`, `Gateway::primitive_stream`, `Gateway::primitive_realtime` scaffold | `PrimitiveRequest`, `PrimitiveResponse`, `PrimitiveStreamEvent` | You need raw provider-native APIs such as OpenAI Images/Audio, Anthropic Messages/Count Tokens, Gemini GenerateContent/CountTokens, or OpenAI-compatible raw payloads | Shared `BudgetTracker` |
+| Provider primitive | `Gateway::primitive_call`, `Gateway::primitive_stream`, `Gateway::primitive_realtime` | `PrimitiveRequest`, `PrimitiveResponse`, `PrimitiveStreamEvent`, `PrimitiveRealtimeSession` | You need raw provider-native APIs such as OpenAI Images/Audio/Realtime, Anthropic Messages/Count Tokens, Gemini GenerateContent/CountTokens/Live, or OpenAI-compatible raw payloads | Shared `BudgetTracker` |
 
 The canonical path remains the default and does not require primitive configuration.
 Primitive mode is explicit: configure a `PrimitiveProviderEndpoint`, send a
@@ -95,12 +95,14 @@ current Spec explicitly promotes them.
 
 Current primitive support tiers:
 
+WebSocket realtime support is implemented for OpenAI Realtime and Gemini Live. WebRTC transport is intentionally not claimed as implemented and remains planned until feature-gated tests cover it.
+
 | Tier | Provider coverage | Budget class |
 | --- | --- | --- |
 | P0 core | OpenAI Responses/Chat/Images/Audio/Embeddings, Anthropic Messages/Count Tokens/Batches/Files, Gemini Generate/Stream/Count/Embed/Files/Caches | token or media fallback |
 | P1 HTTP gaps | OpenAI Files/Uploads/Models/Audio Translations/Image edits/variations, Anthropic Models/Files hardening, Gemini Models/Operations/Files/Caches hardening | zero-cost metadata, upload/storage, or billable-unit fallback |
 | P2 async jobs | Batch lifecycle provider APIs | async job usage when observed |
-| P3 transports | binary chunk streaming and realtime sessions | close/cancel/partial usage settlement |
+| P3 transports | OpenAI Audio Speech binary chunks, OpenAI Realtime WebSocket, Gemini Live WebSocket; WebRTC remains planned | close/cancel/provider-error/no-usage fallback settlement |
 | Deferred | admin, billing, fine-tuning, evals, tunings, managed agents, hosted RAG control plane, SDK helpers | out of scope |
 
 ```rust

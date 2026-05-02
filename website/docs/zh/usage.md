@@ -33,7 +33,7 @@ OmniLLM 目前有三条主要使用面：
    - 规范化流式事件
 
 2. Provider primitive runtime API
-   当你需要直接发送 provider-native 请求、并且不希望经过 `LlmRequest`、`LlmResponse`、`ApiRequest` 或 `ApiResponse` 转换时使用它。Primitive 调用复用同一个 `Gateway` Key 池、RPM 防护、timeout 和 `BudgetTracker`。
+   当你需要直接发送 provider-native 请求、并且不希望经过 `LlmRequest`、`LlmResponse`、`ApiRequest` 或 `ApiResponse` 转换时使用它。Primitive call、stream 和 realtime 入口复用同一个 `Gateway` Key 池、RPM 防护、timeout 和 `BudgetTracker`。
 
 3. API 与协议转换辅助工具
    当你需要以下能力时使用这一组工具：
@@ -182,7 +182,7 @@ println!("primitive status={} body={:?}", response.status, response.body);
 
 当 provider 返回 OpenAI `usage`、Anthropic `usage` 或 Gemini `usageMetadata` 等已知字段时，primitive usage telemetry 会保存在 `PrimitiveResponse::usage`。Budget settlement 会优先使用这些 telemetry；没有 token usage 时则回退到预留估算。
 
-Primitive provider support 的边界是模型工作负载网关能力，不追求完整 provider SDK parity。P1 HTTP gaps 包括 OpenAI Files/Uploads/Models/Audio Translations/Image edits/variations、Anthropic Models/Files hardening，以及 Gemini Models/Operations/Files/Caches hardening。Metadata 和 read-only operations 默认 zero-cost；uploads 归为 upload/storage；media calls 使用 billable-unit telemetry 或预留估算回退。
+Primitive provider support 的边界是模型工作负载网关能力，不追求完整 provider SDK parity。P1 HTTP gaps 包括 OpenAI Files/Uploads/Models/Audio Translations/Image edits/variations、Anthropic Models/Files hardening，以及 Gemini Models/Operations/Files/Caches hardening。P2 覆盖 batch-style API 的显式 async job lifecycle。P3 覆盖 OpenAI Audio Speech binary chunk streaming，以及 OpenAI Realtime 和 Gemini Live 的 WebSocket realtime session；WebRTC 仍是 planned，不声明为已实现。Metadata 和 read-only operations 默认 zero-cost；uploads 归为 upload/storage；media calls 和 realtime sessions 使用 provider telemetry 或预留估算回退。
 
 Deferred surfaces 包括 admin、billing、webhooks、fine-tuning、evals、tunings、managed-agent platforms、hosted RAG/vector-store administration 和 SDK helper layers。
 

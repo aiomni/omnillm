@@ -74,6 +74,7 @@ Core types:
 - `PrimitiveRequest`
 - `PrimitiveResponse`
 - `PrimitiveStreamEvent`
+- `PrimitiveRealtimeSession`
 - `PrimitiveProviderKind`
 - `PrimitiveEndpointKind`
 - `ProviderPrimitiveWireFormat`
@@ -93,8 +94,8 @@ let gateway = GatewayBuilder::new(ProviderEndpoint::openai_responses())
 Common primitive methods:
 
 - `gateway.primitive_call(request, cancel)`
-- `gateway.primitive_stream(request, cancel)` for SSE streams
-- `gateway.primitive_realtime(request, cancel)` currently returns an explicit scaffold error until realtime transport support is complete
+- `gateway.primitive_stream(request, cancel)` for SSE and binary chunk streams
+- `gateway.primitive_realtime(request, cancel)` for test-backed WebSocket realtime sessions; WebRTC remains planned
 
 Rules:
 
@@ -109,6 +110,9 @@ Rules:
 - P1 primitive HTTP gaps are in scope for raw provider calls: OpenAI
   Files/Uploads/Models/Audio Translations/Image edits/variations, Anthropic
   Models/Files hardening, and Gemini Models/Operations/Files/Caches hardening.
+- P2 primitive async jobs cover batch-style lifecycle calls; P3 transports cover
+  OpenAI Audio Speech binary chunks plus OpenAI Realtime and Gemini Live
+  WebSocket sessions. WebRTC remains planned until tests cover it.
 - Metadata/read-only primitive endpoints settle zero unless provider usage is
   reported; uploads use the upload/storage budget class.
 - Do not claim or implement admin, billing, fine-tuning, eval, tuning,

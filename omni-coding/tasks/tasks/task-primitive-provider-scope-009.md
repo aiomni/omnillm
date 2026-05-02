@@ -15,7 +15,7 @@ blocks:
 ---
 
 # Background
-OpenAI Realtime and Gemini Live require session lifecycle transports and should remain explicit scaffolds until WebSocket/WebRTC behavior is implemented and tested.
+OpenAI Realtime and Gemini Live require explicit session lifecycle transports. WebSocket behavior is now implemented and tested; WebRTC remains planned until reliable transport tests cover it.
 
 # Goal
 - Implement realtime session opening, event send/receive, close, cancellation, and usage settlement for supported transports.

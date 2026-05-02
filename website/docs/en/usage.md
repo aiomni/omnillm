@@ -35,7 +35,7 @@ OmniLLM has three major surfaces:
    - canonical streaming events
 
 2. Provider primitive runtime APIs
-   Use these when you want to send provider-native requests directly without converting through `LlmRequest`, `LlmResponse`, `ApiRequest`, or `ApiResponse`. Primitive calls reuse the same `Gateway` key pool, RPM guard, timeout, and `BudgetTracker`.
+   Use these when you want to send provider-native requests directly without converting through `LlmRequest`, `LlmResponse`, `ApiRequest`, or `ApiResponse`. Primitive call, stream, and realtime entry points reuse the same `Gateway` key pool, RPM guard, timeout, and `BudgetTracker`.
 
 3. API and protocol conversion helpers
    Use these when you want to:
@@ -192,9 +192,13 @@ back to the reserved estimate when no token usage is reported.
 Primitive provider support is scoped to model-workload gateway use cases, not full
 provider SDK parity. P1 HTTP gaps include OpenAI Files/Uploads/Models/Audio
 Translations/Image edits/variations, Anthropic Models/Files hardening, and Gemini
-Models/Operations/Files/Caches hardening. Metadata and read-only operations settle
+Models/Operations/Files/Caches hardening. P2 covers explicit async job lifecycle
+requests for batch-style APIs. P3 covers OpenAI Audio Speech binary chunk
+streaming plus WebSocket realtime sessions for OpenAI Realtime and Gemini Live;
+WebRTC remains planned, not implemented. Metadata and read-only operations settle
 as zero-cost unless provider usage appears; uploads settle as upload/storage;
-media calls use billable-unit telemetry or reserved-estimate fallback.
+media calls and realtime sessions use provider telemetry or reserved-estimate
+fallback.
 
 Deferred surfaces include admin, billing, webhooks, fine-tuning, evals, tunings,
 managed-agent platforms, hosted RAG/vector-store administration, and SDK helper

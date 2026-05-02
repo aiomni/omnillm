@@ -29,14 +29,14 @@
 - Done: P2 cross-provider batch lifecycle implementation.
 - Done: P3 binary chunk streaming transport.
 - Done: P3 realtime session WebSocket transport for OpenAI Realtime and Gemini Live; WebRTC remains planned.
-- Todo: final docs, validation, and support claim audit.
+- Done: final docs, validation, and support claim audit.
 
 ## Milestones
 - Milestone 1: Scope guardrails — done (`task-primitive-provider-scope-001`).
 - Milestone 2: P1 HTTP gaps — done (`task-primitive-provider-scope-002` through `005`).
 - Milestone 3: P2 async jobs — done (`task-primitive-provider-scope-006`, `007`).
 - Milestone 4: P3 transports — done (`task-primitive-provider-scope-008`, `009`).
-- Milestone 5: final support claim audit — task 010.
+- Milestone 5: final support claim audit — done (`task-primitive-provider-scope-010`).
 
 ## Acceptance Signals
 - Deferred APIs fail registry/guardrail checks unless a current Spec explicitly promotes them.
@@ -49,4 +49,14 @@
 - `cargo fmt`, `cargo fmt --check`, `cargo test primitive --tests`, `cargo test --test api_surface`, `cargo test`, and `cargo check --examples` pass.
 - Spec/task YAML validation passes.
 - Project page, task cards, and dashboard are synchronized.
-- Support matrix distinguishes Implemented, Compatible, Scaffolded, Planned, and Deferred.
+- Support matrix distinguishes Implemented, Compatible, Planned, and Deferred without claiming full SDK parity.
+
+
+## Validation Record
+- `cargo fmt` — passed.
+- `cargo fmt --check` — passed.
+- `cargo test primitive --tests` — passed.
+- `cargo test --test api_surface` — passed.
+- `cargo test` — passed.
+- `cargo check --examples` — passed.
+- Current Spec YAML and task frontmatter validation — passed.

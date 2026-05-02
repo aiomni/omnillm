@@ -16,12 +16,13 @@ Plans:
 - No active tasks.
 
 ## Todo
-- `task-primitive-provider-scope-010`: Finalize primitive expansion docs validation and support claims
+- No active todo tasks for primitive provider scope expansion.
 
 ## Blocked
 - No blocked tasks.
 
 ## Done
+- `task-primitive-provider-scope-010`: Finalize primitive expansion docs validation and support claims
 - `task-primitive-provider-scope-009`: Implement realtime session transports
 - `task-primitive-provider-scope-008`: Implement binary chunk streaming transport
 - `task-primitive-provider-scope-007`: Implement P2 batch lifecycle providers
@@ -51,8 +52,8 @@ Plans:
 - `task-prompt-cache-008`: Update prompt cache documentation
 
 ## Critical Path
-- Primitive provider scope expansion: scope guardrails, P1 HTTP gaps, P2 async jobs, and P3 transports done; final support claim audit remains.
-- Primitive protocol: completed through canonical guardrails, primitive model, registry, non-stream execution, unified budget projection, provider family slices, SSE stream scaffold, realtime scaffold, docs, examples, config/spec sync, and validation.
+- Primitive provider scope expansion: scope guardrails, P1 HTTP gaps, P2 async jobs, P3 transports, docs, validation, and support claim audit done.
+- Primitive protocol: completed through canonical guardrails, primitive model, registry, non-stream execution, unified budget projection, provider family slices, SSE/binary streaming, WebSocket realtime expansion, docs, examples, config/spec sync, and validation.
 - Prompt cache: completed.
 
 ## Milestones
@@ -60,7 +61,7 @@ Plans:
 - Primitive Provider Expansion Milestone 2: P1 HTTP gaps — done.
 - Primitive Provider Expansion Milestone 3: P2 async jobs — done.
 - Primitive Provider Expansion Milestone 4: P3 transports — done.
-- Primitive Provider Expansion Milestone 5: final support claim audit — todo.
+- Primitive Provider Expansion Milestone 5: final support claim audit — done.
 - Primitive Milestone 1: canonical guardrails and public mode boundary — done.
 - Primitive Milestone 2: primitive registry and non-stream execution — done.
 - Primitive Milestone 3: unified budget and usage projection — done.
@@ -74,4 +75,4 @@ Plans:
 - OpenAI, Anthropic, Gemini/Vertex, OpenAI-compatible, Bedrock, and Custom HTTP support levels are explicit.
 - Canonical and primitive paths use one token budget system with reserve/refund/settle-once guarantees.
 - Documentation and examples explain both protocol modes and only claim test-backed provider support.
-- Validation completed with `cargo fmt`, `cargo test primitive --tests`, `cargo test --test api_surface`, and `cargo test`.
+- Validation completed with `cargo fmt`, `cargo fmt --check`, `cargo test primitive --tests`, `cargo test --test api_surface`, `cargo test`, `cargo check --examples`, and current Spec YAML and task frontmatter validation.

@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-010
 title: Finalize primitive expansion docs validation and support claims
-status: todo
+status: done
 priority: P1
 tags: [primitive-provider-scope, docs, validation]
 project: primitive-provider-scope-expansion
@@ -24,11 +24,11 @@ After P1/P2/P3 implementation, public docs and task state must reflect exact sup
 - Ensure deferred APIs remain documented as deferred.
 
 # Execution Steps
-- [ ] Audit support matrix against implemented registry and tests.
-- [ ] Update README, website docs, skill reference, and examples for final P1/P2/P3 state.
-- [ ] Update specs if support levels changed during implementation.
-- [ ] Run final validation commands from the expansion plan.
-- [ ] Synchronize project page, task cards, and dashboard statuses.
+- [x] Audit support matrix against implemented registry and tests.
+- [x] Update README, website docs, skill reference, and examples for final P1/P2/P3 state.
+- [x] Update specs if support levels changed during implementation.
+- [x] Run final validation commands from the expansion plan.
+- [x] Synchronize project page, task cards, and dashboard statuses.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -47,10 +47,16 @@ After P1/P2/P3 implementation, public docs and task state must reflect exact sup
 - Recommended action: keep support wording conservative and test-backed.
 
 # Execution Log
-- Not started.
+- Audited support claims across README, website docs, skill reference, examples, current Specs, project pages, and task dashboard.
+- Updated public wording to state exact implemented P1/P2/P3 scope: P1 HTTP gaps, P2 async batch-style lifecycle, P3 OpenAI Audio Speech binary chunks, OpenAI Realtime WebSocket, and Gemini Live WebSocket.
+- Recorded WebRTC as planned/not implemented and kept deferred admin, billing, fine-tuning, eval, tuning, managed-agent, hosted RAG, webhook, and SDK-helper parity out of supported scope.
+- Added `examples/primitive_transport_modes.rs` as a compile-only P3 transport construction example.
+- Validation passed: `cargo fmt`, `cargo fmt --check`, `cargo test primitive --tests`, `cargo test --test api_surface`, `cargo test`, `cargo check --examples`, and current Spec YAML and task frontmatter validation.
 
 # Review
-- Review status: pending.
+- Review status: done.
+- Task can be marked done: all public support claims are conservative and map to registry/test-backed implementation or explicit Planned/Deferred state.
+- No new follow-up task is required for this expansion slice; WebRTC remains planned and should only become a task after a current Spec promotes its transport tests.
 
 # Notes
 - Source plan: `omni-coding/plans/current/plan.primitive-provider-scope-expansion.md`.

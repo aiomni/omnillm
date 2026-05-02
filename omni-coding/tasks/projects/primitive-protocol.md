@@ -30,7 +30,7 @@
 - Done: Primitive non-stream execution path is implemented with raw payload preservation.
 - Done: Primitive usage projection and unified budget settlement are implemented.
 - Done: OpenAI, Anthropic, Gemini/Vertex, OpenAI-compatible, Bedrock planned, and Custom HTTP support statuses are represented.
-- Done: Primitive SSE stream support is implemented; realtime is an explicit scaffold error.
+- Done: Primitive SSE stream, binary chunk stream, and WebSocket realtime support are implemented; WebRTC remains planned.
 - Done: README, website docs, skill reference, and example are updated.
 - Done: Final validation includes fmt, targeted primitive/API tests, full tests, example compilation, and spec/task YAML checks.
 
@@ -43,19 +43,19 @@
 
 ## Key Dependencies
 - All primitive protocol task dependencies are resolved.
-- Realtime remains intentionally scaffolded until a future task adds full WebSocket/WebRTC lifecycle support.
+- WebSocket realtime support was added by the provider scope expansion; WebRTC remains planned until feature-gated transport tests cover it.
 - Bedrock remains planned registry support, not dispatch-enabled support.
 
 ## Acceptance Signals
 - Existing canonical Gateway/API tests pass unchanged.
 - Primitive calls preserve provider-native request/response bodies without canonical conversion.
 - OpenAI, Anthropic, Gemini, and OpenAI-compatible provider slices each have explicit support status and tests.
-- Budget tests prove reserve/refund/settle-once semantics for success, provider error, local rejection, cancellation, stream EOF, and realtime scaffold behavior.
+- Budget tests prove reserve/refund/settle-once semantics for success, provider error, local rejection, cancellation, stream EOF, binary chunks, and WebSocket realtime behavior.
 - Stream fixtures cover OpenAI, Anthropic, and Gemini SSE usage extraction.
 - Docs and examples clearly explain when to use OpenAI Responses canonical mode versus provider primitive mode.
 
 ## Final Acceptance Criteria
-- The implementation satisfies `contract.provider.primitive_protocol` and `capability.primitive_provider.execute` for non-stream calls and SSE streams, with realtime explicitly scaffolded.
+- The implementation satisfies `contract.provider.primitive_protocol` and `capability.primitive_provider.execute` for non-stream calls, SSE streams, binary chunk streams, and WebSocket realtime sessions; WebRTC remains planned.
 - OpenAI Responses remains the standard protocol and default user-facing path.
 - Provider primitive APIs are additive and do not require existing users to change code.
 - Token budget is unified across both protocol forms.
