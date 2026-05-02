@@ -1,6 +1,6 @@
 id: capability.budget.cost
 kind: capability
-version: 3
+version: 2
 status: current
 summary: 请求成本估算、预算预留与结算
 
@@ -9,9 +9,6 @@ sources:
     - src/budget/tracker.rs
     - src/budget/mod.rs
     - src/pricing.rs
-  target_modules:
-    - src/primitive_protocol.rs
-    - src/primitive.rs
 
 units:
   MicroDollar: u64
@@ -76,35 +73,11 @@ prompt_cache_pricing_state:
     - provider_specific_cache_write_rate_when_creation_tokens_exist
   fallback_behavior: uncached_prompt_and_completion_rates
 
-primitive_protocol_pricing_state:
-  target_contract: contract.provider.primitive_protocol
-  target_capability: capability.primitive_provider.execute
-  tracker_reuse: BudgetTracker
-  reservation_timing: before_provider_native_transport_dispatch
-  estimate_precedence:
-    - provider_native_count_tokens_endpoint
-    - provider_specific_token_estimator
-    - existing_generation_token_heuristic
-    - conservative_unknown_model_rate
-  settlement_precedence:
-    - provider_reported_token_usage
-    - provider_reported_billable_units_with_rate_table
-    - observed_partial_stream_usage
-    - reserved_estimate
-  usage_projection:
-    input: PrimitiveUsageTelemetry
-    token_output: Option<TokenUsage>
-    cost_output: MicroDollar
-    raw_usage_preserved: true
-  no_conversion_rule: usage_projection_must_not_rewrite_primitive_payload
-
 constraints:
   cost_storage_is_fixed_point: true
   budget_tracker_is_lock_free: true
   estimate_uses_input_rate: true
   unknown_model_is_conservative_default: true
-  primitive_execution_uses_same_budget_tracker: true
-  primitive_budget_projection_is_side_channel_only: true
 
 invariants:
   - failed_reserve_does_not_modify_used
@@ -112,8 +85,6 @@ invariants:
   - actual_cost_can_adjust_reservation_up_or_down
   - remaining_budget_saturates_at_zero
   - floating_point_is_not_used_for_atomic_storage
-  - primitive_budget_reservation_uses_existing_tracker
-  - primitive_usage_projection_preserves_raw_payload
 
 semantics:
   failed_reserve_does_not_modify_used: 超出预算时 try_reserve 返回 false 且 used 不变。
@@ -121,8 +92,6 @@ semantics:
   actual_cost_can_adjust_reservation_up_or_down: 真实成本高于估算时补记，低于估算时退款。
   remaining_budget_saturates_at_zero: remaining_usd 使用 saturating_sub 避免负值。
   floating_point_is_not_used_for_atomic_storage: USD 只在边界转换，内部用 MicroDollar。
-  primitive_budget_reservation_uses_existing_tracker: primitive protocol 请求不创建独立预算系统，仍使用 BudgetTracker reserve 与 settle。
-  primitive_usage_projection_preserves_raw_payload: primitive usage 解析只能生成计费用投影，不能修改返回给用户的 provider native payload。
 
 relations:
   depends_on:
@@ -131,5 +100,4 @@ relations:
   constrains:
     - capability.gateway.execute
     - contract.prompt_cache.policy
-    - contract.provider.primitive_protocol
-    - capability.primitive_provider.execute
+

@@ -1,0 +1,53 @@
+id: patch.primitive_protocol.architecture
+kind: patch
+created: 2026-05-02
+status: applied
+summary: 新增 provider primitive protocol 架构并复用现有 budget 计算
+
+operations:
+  - op: create
+    target: contract.provider.primitive_protocol
+    reason: 定义 OpenAI Responses 标准协议与 provider native primitive protocol 并行的目标架构。
+  - op: create
+    target: capability.primitive_provider.execute
+    reason: 定义 primitive 请求在不经过 canonical 转换时的执行、stream、realtime 与结算路径。
+  - op: update
+    target: capability.budget.cost
+    expected_version: 2
+    reason: 明确 primitive protocol 与 canonical gateway 复用同一 BudgetTracker、估算顺序和结算语义。
+    changes:
+      set:
+        version: 3
+      add:
+        sources.target_modules:
+          - src/primitive_protocol.rs
+          - src/primitive.rs
+        primitive_protocol_pricing_state: contract.provider.primitive_protocol
+        constraints.primitive_execution_uses_same_budget_tracker: true
+        constraints.primitive_budget_projection_is_side_channel_only: true
+        invariants:
+          - primitive_budget_reservation_uses_existing_tracker
+          - primitive_usage_projection_preserves_raw_payload
+        relations.constrains:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute
+  - op: update
+    target: system.src.coverage
+    expected_version: 2
+    reason: 将新增 primitive protocol target specs 标记为 current target-only specs，等待后续实现映射到 src。
+    changes:
+      set:
+        version: 3
+      add:
+        required_spec_ids:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute
+        target_only_spec_ids:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute
+        constraints.target_only_specs_may_wait_for_src_modules: true
+        invariants:
+          - target_only_spec_ids_exist_in_current
+        relations.depends_on:
+          - contract.provider.primitive_protocol
+          - capability.primitive_provider.execute

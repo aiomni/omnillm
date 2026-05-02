@@ -1,0 +1,327 @@
+id: contract.provider.primitive_protocol
+kind: contract
+version: 1
+status: current
+summary: OpenAI Responses 标准协议与 provider primitive 协议并行
+
+sources:
+  target_modules:
+    - src/primitive.rs
+    - src/primitive_protocol.rs
+    - src/primitive_openai.rs
+    - src/primitive_anthropic.rs
+    - src/primitive_gemini.rs
+  external_reference_ids:
+    - openai.openai_go
+    - anthropic.sdk_typescript
+    - googleapis.go_genai
+    - langchain.provider_interface
+    - zeroclaw.provider_runtime
+    - hermes.provider_runtime
+
+protocol_forms:
+  OpenAiResponsesStandard:
+    role: canonical_standard_protocol
+    request_type: LlmRequest
+    response_type: LlmResponse
+    stream_event_type: LlmStreamEvent
+    endpoint_family: Responses
+    default_wire_format: OpenAiResponses
+    execution_capability: capability.gateway.execute
+    conversion_behavior: uses_generation_transcoding_for_non_responses_wire_formats
+  ProviderPrimitive:
+    role: provider_native_protocol
+    request_type: PrimitiveRequest
+    response_type: PrimitiveResponse
+    stream_event_type: PrimitiveStreamEvent
+    realtime_type: PrimitiveRealtimeSession
+    endpoint_family: PrimitiveEndpointKind
+    default_wire_format: ProviderPrimitiveWireFormat
+    execution_capability: capability.primitive_provider.execute
+    conversion_behavior: no_canonical_request_or_response_conversion
+
+primitive_types:
+  PrimitiveProviderKind:
+    variants:
+      - OpenAi
+      - AzureOpenAi
+      - Anthropic
+      - Gemini
+      - VertexAi
+      - Bedrock
+      - OpenAiCompatible
+      - Custom
+  PrimitiveEndpointKind:
+    variants:
+      - Responses
+      - ChatCompletions
+      - Images
+      - Realtime
+      - AudioTranscriptions
+      - AudioSpeech
+      - Embeddings
+      - Messages
+      - CountTokens
+      - Batches
+      - Files
+      - Caches
+      - Models
+      - Live
+      - Rerank
+      - Custom
+  ProviderPrimitiveWireFormat:
+    variants:
+      - OpenAiResponses
+      - OpenAiChatCompletions
+      - OpenAiImages
+      - OpenAiRealtime
+      - OpenAiAudioTranscriptions
+      - OpenAiAudioSpeech
+      - OpenAiEmbeddings
+      - AnthropicMessages
+      - AnthropicCountTokens
+      - AnthropicMessageBatches
+      - AnthropicFiles
+      - GeminiGenerateContent
+      - GeminiStreamGenerateContent
+      - GeminiCountTokens
+      - GeminiEmbedContent
+      - GeminiLive
+      - GeminiFiles
+      - GeminiCaches
+      - BedrockConverse
+      - BedrockInvokeModel
+      - OpenAiCompatibleChatCompletions
+      - CustomHttp
+  PrimitiveRequest:
+    provider: PrimitiveProviderKind
+    endpoint: PrimitiveEndpointKind
+    wire_format: ProviderPrimitiveWireFormat
+    model: Option<String>
+    method: HttpMethod
+    path: Option<String>
+    query: BTreeMap<String, String>
+    headers: BTreeMap<String, String>
+    accept: Option<String>
+    body: RequestBody
+    stream: PrimitiveStreamMode
+    metadata: VendorExtensions
+  PrimitiveResponse:
+    provider: PrimitiveProviderKind
+    endpoint: PrimitiveEndpointKind
+    wire_format: ProviderPrimitiveWireFormat
+    status: u16
+    headers: BTreeMap<String, String>
+    content_type: Option<String>
+    body: ResponseBody
+    usage: Option<PrimitiveUsageTelemetry>
+    metadata: VendorExtensions
+  PrimitiveStreamEvent:
+    variants:
+      - SseFrame
+      - WebSocketMessage
+      - BinaryChunk
+      - Usage
+      - Completed
+      - Error
+  PrimitiveStreamMode:
+    variants:
+      - None
+      - Sse
+      - WebSocket
+      - WebRtc
+      - BinaryChunks
+  PrimitiveUsageTelemetry:
+    raw_usage: serde_json::Value
+    token_usage: Option<TokenUsage>
+    billable_units: Vec<PrimitiveBillableUnit>
+    vendor_extensions: VendorExtensions
+
+provider_api_families:
+  OpenAi:
+    required:
+      - Responses
+      - ChatCompletions
+      - Images
+      - Realtime
+      - AudioTranscriptions
+      - AudioSpeech
+    expansion:
+      - Embeddings
+      - Files
+      - Batches
+      - Models
+  AzureOpenAi:
+    required:
+      - Responses
+      - ChatCompletions
+      - Images
+      - AudioTranscriptions
+      - AudioSpeech
+    expansion:
+      - Embeddings
+      - Realtime
+  Anthropic:
+    required:
+      - Messages
+      - CountTokens
+      - Batches
+    expansion:
+      - Files
+      - Models
+    required_features:
+      - streaming
+      - tool_use
+      - vision
+      - prompt_cache_usage
+      - thinking_usage
+  Gemini:
+    required:
+      - Messages
+      - CountTokens
+      - Embeddings
+      - Live
+    expansion:
+      - Files
+      - Caches
+      - Batches
+      - Images
+      - Models
+    required_features:
+      - generate_content
+      - stream_generate_content
+      - tools
+      - code_execution
+      - safety_settings
+      - usage_metadata
+  VertexAi:
+    required:
+      - Messages
+      - CountTokens
+      - Embeddings
+    expansion:
+      - Rerank
+      - Live
+      - Images
+  Bedrock:
+    required:
+      - Messages
+    expansion:
+      - Custom
+    required_features:
+      - converse
+      - converse_stream
+      - invoke_model
+      - invoke_model_stream
+  OpenAiCompatible:
+    required:
+      - ChatCompletions
+    expansion:
+      - Responses
+      - Embeddings
+      - Images
+      - AudioTranscriptions
+      - AudioSpeech
+      - Rerank
+
+routing:
+  canonical_default:
+    user_entry: Gateway::call_or_stream
+    request_family: OpenAiResponsesStandard
+    provider_selection: ProviderEndpoint
+    provider_reach: existing_wire_transcoding_or_compat_endpoint
+  primitive_default:
+    user_entry: Gateway::primitive_call_or_stream
+    request_family: ProviderPrimitive
+    provider_selection: PrimitiveProviderEndpoint
+    provider_reach: provider_native_endpoint
+  mode_selection:
+    explicit_mode_field: ProtocolMode
+    default_mode: OpenAiResponsesStandard
+    primitive_requires_endpoint_support: true
+
+conversion_boundaries:
+  canonical_path:
+    request_conversion: parse_or_emit_via_LlmRequest
+    response_conversion: parse_or_emit_via_LlmResponse
+    loss_reporting: ConversionReport
+  primitive_path:
+    request_conversion: forbidden
+    response_conversion: forbidden
+    usage_extraction: side_channel_only
+    error_classification: provider_native_status_and_error_shape
+    loss_reporting: not_applicable
+
+budget_integration:
+  tracker: BudgetTracker
+  capability: capability.budget.cost
+  preflight_estimate_precedence:
+    - provider_native_count_tokens_endpoint
+    - provider_specific_token_estimator
+    - existing_generation_token_heuristic
+    - conservative_unknown_model_rate
+  settlement_precedence:
+    - provider_reported_token_usage
+    - provider_reported_billable_units_with_rate_table
+    - partial_stream_usage
+    - reserved_estimate
+  payload_rule: usage_extraction_must_not_mutate_primitive_payload
+
+registry_requirements:
+  canonical_support_table: ProviderRegistry
+  primitive_support_table: PrimitiveProviderRegistry
+  support_level_values:
+    - Native
+    - Compatible
+    - Planned
+  support_key:
+    - provider
+    - endpoint
+    - wire_format
+    - stream_mode
+
+constraints:
+  openai_responses_remains_standard_protocol: true
+  existing_gateway_calling_api_remains_backward_compatible: true
+  primitive_protocol_does_not_parse_into_llm_request: true
+  primitive_protocol_does_not_emit_from_llm_response: true
+  primitive_request_body_is_transport_source_of_truth: true
+  primitive_response_body_is_transport_source_of_truth: true
+  primitive_usage_extraction_is_side_channel: true
+  primitive_budget_uses_shared_budget_tracker: true
+  primitive_registry_is_separate_from_canonical_wire_registry: true
+
+invariants:
+  - canonical_responses_path_remains_default
+  - primitive_path_never_performs_canonical_transcoding
+  - primitive_payload_reaches_provider_without_semantic_rewrite
+  - primitive_response_returns_provider_native_payload
+  - primitive_budget_reserves_before_dispatch
+  - primitive_budget_settles_once
+  - usage_extraction_does_not_change_returned_payload
+  - unsupported_primitive_endpoint_fails_before_dispatch
+
+semantics:
+  canonical_responses_path_remains_default: 现有 LlmRequest/LlmResponse 调用仍以 OpenAI Responses 作为标准协议入口。
+  primitive_path_never_performs_canonical_transcoding: primitive 请求和响应不会经过 LlmRequest、LlmResponse、ApiRequest 或 ApiResponse 转换。
+  primitive_payload_reaches_provider_without_semantic_rewrite: primitive dispatcher 只允许追加认证、默认 header、base URL、query 和 transport metadata。
+  primitive_response_returns_provider_native_payload: primitive response body 保留 provider 原始 JSON、multipart、binary 或 text 表达。
+  primitive_budget_reserves_before_dispatch: primitive 请求和 canonical 请求共用预算预留顺序。
+  primitive_budget_settles_once: primitive 成功、错误、取消、流结束和实时会话关闭路径只结算一次。
+  usage_extraction_does_not_change_returned_payload: usage parser 只能读取 raw usage 字段并生成 PrimitiveUsageTelemetry。
+  unsupported_primitive_endpoint_fails_before_dispatch: registry 不支持的 primitive endpoint 不会发起 HTTP、WebSocket 或 WebRTC 请求。
+
+relations:
+  depends_on:
+    - contract.generation.model
+    - contract.generation.transcoding
+    - contract.multi_endpoint.model
+    - contract.multi_endpoint.transcoding
+    - contract.endpoint.protocol
+    - contract.provider.registry
+    - contract.error.model
+    - capability.budget.cost
+  extends: []
+  constrains:
+    - capability.gateway.execute
+    - capability.primitive_provider.execute

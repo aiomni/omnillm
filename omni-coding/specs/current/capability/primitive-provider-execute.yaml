@@ -1,0 +1,170 @@
+id: capability.primitive_provider.execute
+kind: capability
+version: 1
+status: current
+summary: Provider primitive protocol 的非转换执行能力
+
+sources:
+  target_modules:
+    - src/primitive.rs
+    - src/primitive_protocol.rs
+    - src/dispatcher.rs
+    - src/gateway.rs
+    - src/pricing.rs
+
+input:
+  primitive_call:
+    request: PrimitiveRequest
+    cancel: CancellationToken
+  primitive_stream:
+    request: PrimitiveRequest
+    cancel: CancellationToken
+  primitive_realtime:
+    request: PrimitiveRequest
+    cancel: CancellationToken
+
+output:
+  primitive_call: Result<PrimitiveResponse, GatewayError>
+  primitive_stream: Result<PrimitiveGatewayStream, GatewayError>
+  primitive_realtime: Result<PrimitiveRealtimeSession, GatewayError>
+
+pipeline:
+  preflight_order:
+    - validate_primitive_endpoint_support
+    - estimate_primitive_usage
+    - estimate_cost
+    - acquire_key_lease
+    - reserve_budget
+    - acquire_local_rpm_slot
+    - build_provider_native_transport
+    - dispatch_provider_native_transport
+  transport_construction:
+    allowed_mutations:
+      - base_url_resolution
+      - auth_injection
+      - default_header_injection
+      - query_auth_injection
+      - timeout_application
+      - stream_accept_header
+    forbidden_mutations:
+      - canonical_request_parse
+      - canonical_request_emit
+      - provider_to_provider_transcode
+      - request_body_schema_rewrite
+      - response_body_schema_rewrite
+  call_settlement:
+    success:
+      cost: pricing_from_primitive_usage_or_estimate
+      key_state: report_success
+    cancelled:
+      cost: full_refund
+      key_state: unchanged
+    rate_limited_or_unauthorized_or_provider_error:
+      cost: full_refund
+      key_state: report_error
+    protocol_or_transport_error:
+      cost: full_refund
+      key_state: unchanged
+  stream_settlement:
+    upstream_open_error:
+      cost: full_refund
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    usage_event:
+      usage: record_latest_primitive_usage
+    completed_event:
+      cost: pricing_from_latest_usage_or_estimate
+      key_state: report_success
+    stream_error_with_usage:
+      cost: pricing_from_latest_usage
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    stream_error_without_usage:
+      cost: pricing_from_partial_usage_or_estimate
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    eof_without_completed:
+      cost: pricing_from_latest_usage_or_estimate
+      key_state: report_success
+  realtime_settlement:
+    session_open_error:
+      cost: full_refund
+      key_state: report_error_for_unauthorized_rate_limited_provider
+    session_close_with_usage:
+      cost: pricing_from_accumulated_realtime_usage
+      key_state: report_success
+    session_close_without_usage:
+      cost: pricing_from_elapsed_partial_usage_or_estimate
+      key_state: report_success
+    cancellation:
+      cost: pricing_from_accumulated_usage_or_partial_usage
+      key_state: unchanged
+
+budget:
+  tracker: BudgetTracker
+  estimate_input: PrimitiveRequest
+  actual_input: PrimitiveUsageTelemetry
+  fallback_usage: reserved_estimate
+  pricing_capability: capability.budget.cost
+  shared_with_canonical_gateway: true
+
+streaming:
+  supported_modes:
+    - Sse
+    - WebSocket
+    - WebRtc
+    - BinaryChunks
+  frame_preservation: provider_native_frame_is_returned_before_optional_usage_event
+  usage_events: side_channel_events_do_not_replace_provider_frames
+  done_detection:
+    OpenAiRealtime: provider_session_closed_or_response_done
+    OpenAiSse: done_marker_or_eof
+    AnthropicMessages: message_stop_or_eof
+    GeminiStreamGenerateContent: response_end_or_eof
+
+errors:
+  classification_inputs:
+    - http_status
+    - provider_error_json
+    - websocket_close_code
+    - transport_error
+    - cancellation
+  normalized_output: GatewayError
+  raw_error_preservation: PrimitiveResponse.vendor_extensions_or_error_source
+
+constraints:
+  primitive_execution_uses_same_key_pool: true
+  primitive_execution_uses_same_budget_tracker: true
+  primitive_execution_uses_same_request_timeout: true
+  primitive_execution_does_not_use_generation_transcoding: true
+  primitive_execution_does_not_use_multi_endpoint_transcoding: true
+  primitive_usage_parser_is_non_mutating: true
+  primitive_stream_usage_is_side_channel: true
+
+invariants:
+  - primitive_endpoint_support_checked_before_budget_reservation
+  - key_lease_precedes_budget_reservation
+  - budget_reservation_precedes_transport_dispatch
+  - local_rpm_rejection_refunds_primitive_budget
+  - cancellation_refunds_or_partially_settles_primitive_budget
+  - primitive_budget_reservation_is_settled_once_per_execution_path
+  - primitive_payload_is_not_canonicalized
+  - primitive_raw_response_is_preserved
+
+semantics:
+  primitive_endpoint_support_checked_before_budget_reservation: registry 不支持的 primitive endpoint 不占用 key、RPM 或预算。
+  key_lease_precedes_budget_reservation: primitive 执行复用 canonical gateway 的 key-pool 预留顺序。
+  budget_reservation_precedes_transport_dispatch: primitive HTTP、SSE、WebSocket 或 WebRTC 请求发出前必须完成预算预留。
+  local_rpm_rejection_refunds_primitive_budget: primitive 本地 RPM 拒绝必须退回已预留预算。
+  cancellation_refunds_or_partially_settles_primitive_budget: cancellation 根据是否已有 usage 或 partial usage 决定退款或部分结算。
+  primitive_budget_reservation_is_settled_once_per_execution_path: primitive 每条执行路径只能调用一次预算 settle。
+  primitive_payload_is_not_canonicalized: primitive 执行不会把请求 body 转为 LlmRequest、ApiRequest 或其他 canonical schema。
+  primitive_raw_response_is_preserved: primitive response 或 stream frame 保持 provider native 结构返回给调用者。
+
+relations:
+  depends_on:
+    - contract.provider.primitive_protocol
+    - contract.gateway.config
+    - contract.endpoint.protocol
+    - capability.key_pool.balance
+    - capability.budget.cost
+    - contract.error.model
+  extends: []
+  constrains: []
