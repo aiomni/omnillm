@@ -16,7 +16,6 @@ Plans:
 - No active tasks.
 
 ## Todo
-- `task-primitive-provider-scope-001`: Add primitive scope guardrails and registry vocabulary
 - `task-primitive-provider-scope-002`: Implement P1 OpenAI primitive HTTP gaps
 - `task-primitive-provider-scope-003`: Implement P1 Anthropic metadata and files gaps
 - `task-primitive-provider-scope-004`: Implement P1 Gemini metadata operations and file gaps
@@ -31,6 +30,7 @@ Plans:
 - No blocked tasks.
 
 ## Done
+- `task-primitive-provider-scope-001`: Add primitive scope guardrails and registry vocabulary
 - `task-primitive-protocol-001`: Add canonical path guardrails
 - `task-primitive-protocol-002`: Define primitive public model and mode boundary
 - `task-primitive-protocol-003`: Add primitive provider registry and support matrix
@@ -51,12 +51,12 @@ Plans:
 - `task-prompt-cache-008`: Update prompt cache documentation
 
 ## Critical Path
-- Primitive provider scope expansion: todo through scope guardrails, P1 HTTP gaps, P2 async jobs, P3 transports, and final support claim audit.
+- Primitive provider scope expansion: scope guardrails done; todo through P1 HTTP gaps, P2 async jobs, P3 transports, and final support claim audit.
 - Primitive protocol: completed through canonical guardrails, primitive model, registry, non-stream execution, unified budget projection, provider family slices, SSE stream scaffold, realtime scaffold, docs, examples, config/spec sync, and validation.
 - Prompt cache: completed.
 
 ## Milestones
-- Primitive Provider Expansion Milestone 1: scope guardrails — todo.
+- Primitive Provider Expansion Milestone 1: scope guardrails — done.
 - Primitive Provider Expansion Milestone 2: P1 HTTP gaps — todo.
 - Primitive Provider Expansion Milestone 3: P2 async jobs — todo.
 - Primitive Provider Expansion Milestone 4: P3 transports — todo.

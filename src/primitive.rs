@@ -13,6 +13,25 @@ use crate::types::{PromptCacheUsage, TokenUsage, VendorExtensions};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum PrimitiveSupportTier {
+    P0KeepAndHarden,
+    P1LowRiskHttpGaps,
+    P2AsyncJobLifecycle,
+    P3TransportExpansion,
+    Deferred,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PrimitiveBudgetClass {
+    TokenMetered,
+    BillableUnitMetered,
+    MetadataOrControlPlaneZeroCost,
+    UploadOrStorage,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PrimitiveProviderKind {
     OpenAi,
     AzureOpenAi,
@@ -364,6 +383,8 @@ pub struct PrimitiveEndpointSupport {
     pub level: SupportLevel,
     pub wire_formats: Vec<ProviderPrimitiveWireFormat>,
     pub stream_modes: Vec<PrimitiveStreamMode>,
+    pub scope_tier: PrimitiveSupportTier,
+    pub budget_class: PrimitiveBudgetClass,
 }
 
 impl PrimitiveEndpointSupport {
@@ -807,7 +828,87 @@ fn support(
         level,
         wire_formats: wire_formats.to_vec(),
         stream_modes: stream_modes.to_vec(),
+        scope_tier: infer_scope_tier(endpoint, wire_formats, stream_modes),
+        budget_class: infer_budget_class(endpoint, wire_formats),
     }
+}
+
+fn infer_scope_tier(
+    endpoint: PrimitiveEndpointKind,
+    wire_formats: &[ProviderPrimitiveWireFormat],
+    stream_modes: &[PrimitiveStreamMode],
+) -> PrimitiveSupportTier {
+    if stream_modes.iter().any(|mode| {
+        matches!(
+            mode,
+            PrimitiveStreamMode::WebSocket
+                | PrimitiveStreamMode::WebRtc
+                | PrimitiveStreamMode::BinaryChunks
+        )
+    }) {
+        return PrimitiveSupportTier::P3TransportExpansion;
+    }
+
+    if matches!(endpoint, PrimitiveEndpointKind::Batches) {
+        return PrimitiveSupportTier::P2AsyncJobLifecycle;
+    }
+
+    if matches!(
+        endpoint,
+        PrimitiveEndpointKind::Files
+            | PrimitiveEndpointKind::Models
+            | PrimitiveEndpointKind::Caches
+    ) {
+        return PrimitiveSupportTier::P1LowRiskHttpGaps;
+    }
+
+    if wire_formats.iter().any(|wire_format| {
+        matches!(
+            wire_format,
+            ProviderPrimitiveWireFormat::GeminiFiles
+                | ProviderPrimitiveWireFormat::GeminiCaches
+                | ProviderPrimitiveWireFormat::AnthropicFiles
+        )
+    }) {
+        return PrimitiveSupportTier::P1LowRiskHttpGaps;
+    }
+
+    PrimitiveSupportTier::P0KeepAndHarden
+}
+
+fn infer_budget_class(
+    endpoint: PrimitiveEndpointKind,
+    wire_formats: &[ProviderPrimitiveWireFormat],
+) -> PrimitiveBudgetClass {
+    if matches!(endpoint, PrimitiveEndpointKind::Models) {
+        return PrimitiveBudgetClass::MetadataOrControlPlaneZeroCost;
+    }
+
+    if matches!(endpoint, PrimitiveEndpointKind::Files) {
+        return PrimitiveBudgetClass::UploadOrStorage;
+    }
+
+    if matches!(
+        endpoint,
+        PrimitiveEndpointKind::Images
+            | PrimitiveEndpointKind::AudioTranscriptions
+            | PrimitiveEndpointKind::AudioSpeech
+    ) {
+        return PrimitiveBudgetClass::BillableUnitMetered;
+    }
+
+    if wire_formats.iter().any(|wire_format| {
+        matches!(
+            wire_format,
+            ProviderPrimitiveWireFormat::OpenAiImages
+                | ProviderPrimitiveWireFormat::OpenAiAudioTranscriptions
+                | ProviderPrimitiveWireFormat::OpenAiAudioSpeech
+        )
+    }) {
+        return PrimitiveBudgetClass::BillableUnitMetered;
+    }
+
+    PrimitiveBudgetClass::TokenMetered
 }
 
 fn default_headers_for(provider: PrimitiveProviderKind) -> BTreeMap<String, String> {

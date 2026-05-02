@@ -1,7 +1,7 @@
 ---
 id: task-primitive-provider-scope-001
 title: Add primitive scope guardrails and registry vocabulary
-status: todo
+status: done
 priority: P0
 tags: [primitive-provider-scope, registry, guardrails]
 project: primitive-provider-scope-expansion
@@ -26,11 +26,11 @@ Primitive provider expansion must stay inside `contract.primitive_provider.scope
 - Preserve existing canonical and primitive behavior while adding guardrails.
 
 # Execution Steps
-- [ ] Audit current `PrimitiveEndpointKind` and `ProviderPrimitiveWireFormat` against `contract.primitive_provider.scope`.
-- [ ] Add or update registry tests for P0, P1, P2, P3, and deferred support classifications.
-- [ ] Add guardrail tests proving deferred APIs are not Native/Compatible by default.
-- [ ] Add budget-class fixtures for token, billable-unit, zero-cost metadata, and upload/storage endpoint classes.
-- [ ] Update public support matrix docs only if registry semantics change.
+- [x] Audit current `PrimitiveEndpointKind` and `ProviderPrimitiveWireFormat` against `contract.primitive_provider.scope`.
+- [x] Add or update registry tests for P0, P1, P2, P3, and deferred support classifications.
+- [x] Add guardrail tests proving deferred APIs are not Native/Compatible by default.
+- [x] Add budget-class fixtures for token, billable-unit, zero-cost metadata, and upload/storage endpoint classes.
+- [x] Update public support matrix docs only if registry semantics change.
 
 # Acceptance Criteria
 ## Step-Level Acceptance Criteria
@@ -49,10 +49,15 @@ Primitive provider expansion must stay inside `contract.primitive_provider.scope
 - Recommended action: avoid renaming existing public enums unless unavoidable.
 
 # Execution Log
-- Not started.
+## 2026-05-02
+- Added `PrimitiveSupportTier` and `PrimitiveBudgetClass` to primitive endpoint support descriptors.
+- Added registry guardrail tests covering P0, P3, billable-unit class, and absence of Deferred support claims.
+- Validation: `cargo fmt` and `cargo test primitive --tests` pass.
 
 # Review
-- Review status: pending.
+- Review status: completed.
+- Conclusion: Accepted; scope guardrail and budget-class acceptance criteria are satisfied.
+- Adjustments to downstream tasks, `index.md`, or project page: synchronized on 2026-05-02.
 
 # Notes
 - Source specs: `contract.primitive_provider.scope`, `contract.provider.primitive_protocol`.

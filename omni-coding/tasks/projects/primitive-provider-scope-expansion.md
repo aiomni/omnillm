@@ -20,7 +20,7 @@
 - Async jobs、binary chunk streaming、realtime session 不得复用普通 non-stream `primitive_call` 的隐式生命周期。
 
 ## Current State
-- Todo: scope guardrails and registry vocabulary hardening.
+- Done: scope guardrails and registry vocabulary hardening.
 - Todo: P1 OpenAI low-risk HTTP gaps.
 - Todo: P1 Anthropic metadata/files hardening.
 - Todo: P1 Gemini metadata/operations/files/caches hardening.
@@ -32,7 +32,7 @@
 - Todo: final docs, validation, and support claim audit.
 
 ## Milestones
-- Milestone 1: Scope guardrails — tasks 001.
+- Milestone 1: Scope guardrails — done (`task-primitive-provider-scope-001`).
 - Milestone 2: P1 HTTP gaps — tasks 002 through 005.
 - Milestone 3: P2 async jobs — tasks 006 and 007.
 - Milestone 4: P3 transports — tasks 008 and 009.

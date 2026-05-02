@@ -92,6 +92,7 @@ reexports:
   primitive:
     - embedded_primitive_provider_registry
     - PrimitiveBillableUnit
+    - PrimitiveBudgetClass
     - PrimitiveEndpointKind
     - PrimitiveEndpointSupport
     - PrimitiveProviderDescriptor
@@ -104,6 +105,7 @@ reexports:
     - PrimitiveResponse
     - PrimitiveStreamEvent
     - PrimitiveStreamMode
+    - PrimitiveSupportTier
     - PrimitiveUsageTelemetry
     - ProviderPrimitiveWireFormat
   protocol:

@@ -3,9 +3,9 @@ use std::{io, time::Duration};
 use futures_util::StreamExt;
 use omnillm::{
     embedded_primitive_provider_registry, GatewayBuilder, GatewayError, KeyConfig,
-    PrimitiveEndpointKind, PrimitiveProviderEndpoint, PrimitiveProviderKind, PrimitiveRequest,
-    PrimitiveStreamEvent, PrimitiveStreamMode, ProviderEndpoint, ProviderPrimitiveWireFormat,
-    ResponseBody,
+    PrimitiveBudgetClass, PrimitiveEndpointKind, PrimitiveProviderEndpoint, PrimitiveProviderKind,
+    PrimitiveRequest, PrimitiveStreamEvent, PrimitiveStreamMode, PrimitiveSupportTier,
+    ProviderEndpoint, ProviderPrimitiveWireFormat, ResponseBody,
 };
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -33,6 +33,48 @@ fn primitive_registry_gates_endpoint_wire_and_stream_mode() {
         PrimitiveProviderKind::Bedrock,
         PrimitiveEndpointKind::Messages,
     ));
+}
+
+#[test]
+fn primitive_registry_exposes_scope_tiers_and_budget_classes() {
+    let registry = embedded_primitive_provider_registry();
+    let openai = registry
+        .provider(PrimitiveProviderKind::OpenAi)
+        .expect("openai descriptor");
+    let responses = openai
+        .endpoints
+        .iter()
+        .find(|support| support.endpoint == PrimitiveEndpointKind::Responses)
+        .expect("responses support");
+    assert_eq!(responses.scope_tier, PrimitiveSupportTier::P0KeepAndHarden);
+    assert_eq!(responses.budget_class, PrimitiveBudgetClass::TokenMetered);
+
+    let realtime = openai
+        .endpoints
+        .iter()
+        .find(|support| support.endpoint == PrimitiveEndpointKind::Realtime)
+        .expect("realtime support");
+    assert_eq!(
+        realtime.scope_tier,
+        PrimitiveSupportTier::P3TransportExpansion
+    );
+    assert_eq!(realtime.budget_class, PrimitiveBudgetClass::TokenMetered);
+
+    let audio = openai
+        .endpoints
+        .iter()
+        .find(|support| support.endpoint == PrimitiveEndpointKind::AudioSpeech)
+        .expect("audio support");
+    assert_eq!(
+        audio.budget_class,
+        PrimitiveBudgetClass::BillableUnitMetered
+    );
+
+    assert!(registry
+        .providers
+        .iter()
+        .flat_map(|provider| &provider.endpoints)
+        .all(|support| support.scope_tier != PrimitiveSupportTier::Deferred));
 }
 
 #[test]
