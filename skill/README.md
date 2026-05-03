@@ -75,6 +75,7 @@ example:
 - debug `NoAvailableKey` or `BudgetExceeded`
 - emit an `ApiRequest` as a provider wire format
 - choose between canonical OpenAI Responses mode and provider primitive mode
+- route a provider-native `PrimitiveRequest` through `primitive_call`, `primitive_stream`, or `primitive_realtime`
 
 If the skill does not appear immediately, restart the agent session and rerun
 `npx skills ls -a <agent>`.

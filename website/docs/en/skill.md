@@ -2,8 +2,8 @@
 title: Skill Guide
 description: Install the OmniLLM Skill in Claude Code, Codex, or OpenCode with the Vercel Labs skills installer, and use it for OmniLLM-aware coding and debugging.
 label: skill guide
-release: v0.1.4
-updated: Apr 2026
+release: v0.1.5
+updated: May 2026
 summary: Vercel Labs skills CLI commands for GitHub-based installation and verification across agent runtimes.
 ---
 
@@ -14,6 +14,7 @@ OmniLLM ships with a first-party agent skill in the repository's
 skill teaches agents the crate's real boundaries:
 
 - runtime generation through `Gateway`, `ProviderEndpoint`, and `EndpointProtocol`
+- provider primitive runtime calls through `PrimitiveRequest`, `PrimitiveProviderEndpoint`, and `Gateway::primitive_*`
 - protocol parsing, emission, and transcoding through `parse_*`, `emit_*`, and `transcode_*`
 - typed multi-endpoint conversion through `ApiRequest`, `ApiResponse`, and `WireFormat`
 - replay fixture sanitization through `ReplayFixture` and `sanitize_*`
@@ -85,7 +86,8 @@ OmniLLM-specific, for example:
 - configure an `EndpointProtocol::*_compat` runtime endpoint for an OpenAI-compatible wrapper that requires `messages[].content[]`
 - debug an OpenAI Chat compat stream where `delta.role` and the first `delta.content` arrive in the same SSE frame
 - pass through wrapper-specific OpenAI top-level fields such as `enable_thinking` with `LlmRequest.vendor_extensions`
-- explain when `Gateway` is correct versus `transcode_*`
+- explain when canonical `Gateway` APIs, provider primitive APIs, or `transcode_*` are correct
+- route a provider-native `PrimitiveRequest` through `primitive_call`, `primitive_stream`, or `primitive_realtime`
 - debug `NoAvailableKey`, `BudgetExceeded`, or `Protocol(...)`
 - emit an `ApiRequest` into a provider wire format
 

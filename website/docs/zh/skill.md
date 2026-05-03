@@ -2,8 +2,8 @@
 title: 技能指南
 description: 通过 Vercel Labs skills 安装器把 OmniLLM Skill 安装到 Claude Code、Codex 或 OpenCode 中，并将其用于 OmniLLM 相关编码与调试。
 label: 技能指南
-release: v0.1.4
-updated: 2026 年 4 月
+release: v0.1.5
+updated: 2026 年 5 月
 summary: 通过 GitHub 源安装 OmniLLM Skill 的 Vercel Labs skills CLI 命令，以及不同 agent 的验证方法。
 ---
 
@@ -14,6 +14,7 @@ OmniLLM 在仓库的
 中提供了一份官方智能体技能。它会把这个库的真实边界教给各类智能体：
 
 - 通过 `Gateway`、`ProviderEndpoint` 与 `EndpointProtocol` 进行运行时生成调用
+- 通过 `PrimitiveRequest`、`PrimitiveProviderEndpoint` 与 `Gateway::primitive_*` 进行 provider primitive runtime 调用
 - 通过 `parse_*`、`emit_*` 与 `transcode_*` 完成协议解析、输出和转码
 - 通过 `ApiRequest`、`ApiResponse` 与 `WireFormat` 完成类型化多端点转换
 - 通过 `ReplayFixture` 与 `sanitize_*` 完成回放夹具脱敏
@@ -81,7 +82,8 @@ npx skills ls -a codex --json
 - 给某个要求 `messages[].content[]` 的 OpenAI 兼容包装层配置 `EndpointProtocol::*_compat` 运行时端点
 - 排查某个 OpenAI Chat compat 流里 `delta.role` 和首段 `delta.content` 落在同一个 SSE frame 时的首段正文丢失问题
 - 用 `LlmRequest.vendor_extensions` 透传 `enable_thinking` 这类包装层特有的 OpenAI 顶层字段
-- 解释什么时候应该使用 `Gateway`，什么时候应该直接用 `transcode_*`
+- 解释什么时候应该使用 canonical `Gateway` API、provider primitive API，什么时候应该直接用 `transcode_*`
+- 通过 `primitive_call`、`primitive_stream` 或 `primitive_realtime` 路由 provider-native `PrimitiveRequest`
 - 排查 `NoAvailableKey`、`BudgetExceeded` 或 `Protocol(...)`
 - 把一个 `ApiRequest` 输出成 provider 的传输格式
 

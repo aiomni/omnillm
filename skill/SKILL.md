@@ -9,8 +9,9 @@ description: |
   sanitization. Trigger on code or questions containing `GatewayBuilder`,
   `Gateway`, `KeyConfig`, `PoolConfig`, `ProviderEndpoint`, `EndpointProtocol`,
   `ProviderProtocol`, `LlmRequest`, `LlmResponse`, `LlmStreamEvent`,
-  `CapabilitySet`, `ApiRequest`, `ApiResponse`, `WireFormat`,
-  `emit_transport_request`, `parse_*`, `emit_*`, `transcode_*`,
+  `CapabilitySet`, `PromptCachePolicy`, `PrimitiveRequest`,
+  `PrimitiveProviderEndpoint`, `PrimitiveStreamEvent`, `ApiRequest`,
+  `ApiResponse`, `WireFormat`, `emit_transport_request`, `parse_*`, `emit_*`, `transcode_*`,
   `ReplayFixture`, or env vars like `OMNILLM_RESPONSES_*`.
   Also use this skill for Chinese requests about "多 key 负载均衡", "限流",
   "协议转换", "预算追踪", or errors like `NoAvailableKey`, `BudgetExceeded`,
@@ -18,19 +19,21 @@ description: |
 license: MIT OR Apache-2.0
 metadata:
   author: aiomni
-  version: 0.1.4
+  version: 0.1.5
   docs: https://docs.rs/omnillm
   repo: https://github.com/aiomni/omnillm
 ---
 
 # OmniLLM
 
-OmniLLM is a Rust library for provider-neutral LLM access. It has two major
+OmniLLM is a Rust library for provider-neutral LLM access. It has three major
 surfaces:
 
 - a runtime `Gateway` for generation requests with multi-key load balancing,
   per-key RPM/TPM limiting, circuit breaking, budget tracking, and canonical
   streaming
+- an explicit provider primitive runtime for provider-native payloads that
+  shares the same key pool, RPM guard, timeout model, and budget settlement
 - protocol and typed API conversion helpers for generation, embeddings, image
   generation, audio, and rerank payloads
 
@@ -42,15 +45,20 @@ Before writing code, place the request into exactly one primary lane:
    Use `GatewayBuilder`, `ProviderEndpoint`, `EndpointProtocol`, `KeyConfig`,
    `LlmRequest`, `Gateway::call`, and `Gateway::stream`.
 
-2. Generation protocol parsing or transcoding
+2. Provider primitive runtime
+   Use `PrimitiveProviderEndpoint`, `PrimitiveRequest`, `Gateway::primitive_call`,
+   `Gateway::primitive_stream`, `Gateway::primitive_realtime`, and raw
+   provider-native JSON, SSE, binary, or realtime payloads.
+
+3. Generation protocol parsing or transcoding
    Use `parse_*`, `emit_*`, `transcode_*`, `ProviderProtocol`, and raw JSON
    payloads.
 
-3. Typed multi-endpoint conversion
+4. Typed multi-endpoint conversion
    Use `ApiRequest`, `ApiResponse`, `WireFormat`, `emit_transport_request`,
    `parse_transport_response`, `transcode_api_*`, and `ConversionReport<T>`.
 
-4. Replay fixture sanitization
+5. Replay fixture sanitization
    Use `ReplayFixture`, `sanitize_transport_request`,
    `sanitize_transport_response`, and `sanitize_json_value`.
 
@@ -59,6 +67,9 @@ If the user is unsure, infer the lane from code already present in the repo:
 - `GatewayBuilder`, `LlmRequest`, `Message`, `RequestItem` usually means runtime
   generation
 - `EndpointProtocol` usually means runtime endpoint configuration
+- `PrimitiveRequest`, `PrimitiveProviderEndpoint`, `PrimitiveProviderKind`,
+  `PrimitiveEndpointKind`, or `ProviderPrimitiveWireFormat` means provider
+  primitive runtime work
 - `ProviderProtocol`, `transcode_request`, `emit_request` usually means
   generation protocol work
 - `ApiRequest`, `WireFormat`, `emit_transport_request` usually means typed
@@ -68,14 +79,16 @@ If the user is unsure, infer the lane from code already present in the repo:
 
 ## Critical Constraint
 
-Do not blur the runtime and conversion surfaces.
+Do not blur the canonical, primitive, and conversion surfaces.
 
-`Gateway` currently transports generation requests only. Embeddings, image
-generation, audio transcription, audio speech, and rerank are exposed as
-canonical typed conversion helpers, not as a full runtime client surface. If
-the user asks for runtime transport of those endpoint families, say that
-clearly and guide them toward `emit_transport_request` or `transcode_api_*`
-instead.
+`Gateway::call` and `Gateway::stream` are the backward-compatible canonical
+generation path. Provider primitive APIs are additive and explicit: they must
+preserve provider-native request and response payloads and must not route
+through `LlmRequest`, `LlmResponse`, `ApiRequest`, or `ApiResponse` conversion.
+Primitive calls may cover provider-native model invocation, token counting,
+embeddings, image/audio operations, file/model metadata, async batch lifecycle,
+SSE streams, binary media streaming, and realtime sessions when the primitive
+support registry marks that slice as supported.
 
 ## Default Workflow
 
@@ -204,6 +217,30 @@ Read next:
 
 - `references/examples/basic.rs`
 - `references/api-reference.md#runtime-gateway`
+
+### Provider primitive runtime
+
+Start here when the user needs provider-native request and response payloads,
+non-generation provider endpoints, primitive SSE/binary streams, or realtime
+sessions without canonical conversion.
+
+Use:
+
+- `PrimitiveProviderEndpoint`
+- `PrimitiveRequest`
+- `ProviderPrimitiveWireFormat`
+- `PrimitiveEndpointKind`
+- `Gateway::primitive_call`
+- `Gateway::primitive_stream`
+- `Gateway::primitive_realtime`
+
+Primitive mode must preserve the provider-native body. Extract telemetry into
+`PrimitiveResponse::usage` or `PrimitiveStreamEvent::Usage`, but do not mutate
+the returned provider payload just to normalize it.
+
+Read next:
+
+- `references/api-reference.md#provider-primitive-runtime`
 
 ### Protocol conversion
 
