@@ -1657,8 +1657,9 @@ body:has(.omn-field-manual) .omn-site-footer {
 }
 
 .omn-field-manual .page {
-  width: min(100%, 1180px);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: clamp(16px, 2.5vw, 34px);
 }
 
@@ -1718,14 +1719,44 @@ body:has(.omn-field-manual) .omn-site-footer {
 
 .omn-field-manual .cover {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: clamp(28px, 4vw, 48px);
-  padding: clamp(28px, 4vw, 46px) 0 clamp(24px, 3.5vw, 38px);
+  grid-template-columns: minmax(150px, 0.16fr) minmax(0, 1fr);
+  grid-template-areas:
+    'kicker headline'
+    'kicker body'
+    'meta meta';
+  gap: 18px clamp(28px, 4vw, 56px);
+  align-items: start;
+  padding: clamp(34px, 4vw, 52px) 0 clamp(26px, 3.4vw, 40px);
   border-bottom: 1px solid var(--hairline);
 }
 
+.omn-field-manual .cover-kicker {
+  grid-area: kicker;
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.omn-field-manual .cover-rule {
+  width: 100%;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.42;
+}
+
+.omn-field-manual .cover-headline {
+  grid-area: headline;
+  max-width: 980px;
+}
+
+.omn-field-manual .cover-body {
+  grid-area: body;
+  max-width: 980px;
+  margin-top: 6px;
+}
+
 .omn-field-manual .eyebrow {
-  margin: 0 0 14px;
+  margin: 0;
   color: var(--accent);
   font-size: 12px;
   font-weight: 520;
@@ -1743,49 +1774,50 @@ body:has(.omn-field-manual) .omn-site-footer {
 }
 
 .omn-field-manual h1 {
-  max-width: 26ch;
+  max-width: 34ch;
   margin: 0;
-  font-size: clamp(23px, 2.6vw, 32px);
-  font-weight: 500;
+  font-size: clamp(24px, 2.1vw, 34px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
   line-height: 1.22;
 }
 
 .omn-field-manual .dek {
-  max-width: 68ch;
-  margin: 15px 0 0;
+  max-width: 74ch;
+  margin: 0;
   color: var(--text);
-  font-size: 16px;
-  line-height: 1.62;
+  font-size: clamp(15.5px, 1vw, 18px);
+  line-height: 1.68;
 }
 
 .omn-field-manual .cover-meta {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 14px;
-  padding-left: 18px;
-  border-left: 1px solid var(--ink);
+  grid-area: meta;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: clamp(18px, 2.4vw, 28px);
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
 }
 
 .omn-field-manual .meta-block {
-  padding-top: 12px;
-  border-top: 1px solid var(--hairline);
+  min-height: 118px;
+  padding: 14px 18px 16px;
+  border-right: 1px solid var(--hairline);
 }
 
-.omn-field-manual .meta-block:first-child {
-  padding-top: 0;
-  border-top: 0;
+.omn-field-manual .meta-block:last-child {
+  border-right: 0;
 }
 
 .omn-field-manual .meta-block b {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 7px;
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 520;
-  letter-spacing: -0.035em;
+  font-weight: 500;
+  letter-spacing: -0.03em;
   line-height: 1.25;
 }
 
@@ -1793,7 +1825,7 @@ body:has(.omn-field-manual) .omn-site-footer {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.58;
 }
 
 .omn-field-manual .feature-strip {
@@ -1836,8 +1868,8 @@ body:has(.omn-field-manual) .omn-site-footer {
 
 .omn-field-manual .issue-grid {
   display: grid;
-  grid-template-columns: 170px minmax(0, 700px) 190px;
-  gap: clamp(22px, 3vw, 38px);
+  grid-template-columns: minmax(150px, 0.14fr) minmax(0, 1fr) minmax(180px, 0.18fr);
+  gap: clamp(22px, 3vw, 44px);
   padding-top: clamp(28px, 4vw, 44px);
 }
 
@@ -2173,11 +2205,25 @@ body:has(.omn-field-manual) .omn-site-footer {
 
 @media (max-width: 1080px) {
   .omn-field-manual .cover {
-    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+
+  .omn-field-manual .cover-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .omn-field-manual .meta-block {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .omn-field-manual .meta-block:last-child {
+    border-bottom: 0;
   }
 
   .omn-field-manual .issue-grid {
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: minmax(140px, 0.18fr) minmax(0, 1fr);
   }
 
   .omn-field-manual .margin-notes {
@@ -2219,14 +2265,16 @@ body:has(.omn-field-manual) .omn-site-footer {
 
   .omn-field-manual .cover {
     grid-template-columns: 1fr;
-    gap: 28px;
+    grid-template-areas:
+      'kicker'
+      'headline'
+      'body'
+      'meta';
+    gap: 18px;
   }
 
-  .omn-field-manual .cover-meta {
-    padding-top: 18px;
-    padding-left: 0;
-    border-top: 1px solid var(--ink);
-    border-left: 0;
+  .omn-field-manual .cover-rule {
+    display: none;
   }
 
   .omn-field-manual .feature-strip {

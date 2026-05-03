@@ -734,9 +734,14 @@ export function LandingPage() {
         </header>
 
         <section className="cover" id="top" data-od-id="hero">
-          <div>
+          <div className="cover-kicker">
             <p className="eyebrow">{copy.eyebrow}</p>
+            <div className="cover-rule" aria-hidden="true" />
+          </div>
+          <div className="cover-headline">
             <h1 data-od-id="headline">{copy.title}</h1>
+          </div>
+          <div className="cover-body">
             <p className="dek" data-od-id="body">
               {copy.dek}
             </p>
