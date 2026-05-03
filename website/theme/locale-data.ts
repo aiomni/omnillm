@@ -87,7 +87,48 @@ type ChromeText = {
 export const DEFAULT_LANGUAGE: SiteLanguage = 'en';
 export const LANGUAGE_STORAGE_KEY = 'omnillm.language';
 export const SUPPORTED_LANGUAGES: SiteLanguage[] = ['en', 'zh'];
-export const SITE_BASE = normalizeBase(process.env.RSPRESS_BASE ?? '/');
+export const SITE_BASE = normalizeBase(readSiteBase());
+
+function readSiteBase() {
+  if (typeof process !== 'undefined') {
+    return process.env?.RSPRESS_BASE ?? '/';
+  }
+
+  if (typeof document === 'undefined') {
+    return '/';
+  }
+
+  const staticAsset = document.querySelector<HTMLLinkElement | HTMLScriptElement>(
+    'script[src*="/static/"], link[href*="/static/"]'
+  );
+  const staticAssetPath =
+    staticAsset?.getAttribute('src') ?? staticAsset?.getAttribute('href');
+  const staticBase = inferBaseFromAssetPath(staticAssetPath, '/static/');
+
+  if (staticBase) {
+    return staticBase;
+  }
+
+  const icon = document.querySelector<HTMLLinkElement>('link[rel~="icon"][href]');
+  const iconBase = inferBaseFromAssetPath(icon?.getAttribute('href'), '/favicon.svg');
+
+  return iconBase ?? '/';
+}
+
+function inferBaseFromAssetPath(assetPath: string | null | undefined, marker: string) {
+  if (!assetPath || typeof window === 'undefined') {
+    return null;
+  }
+
+  const pathname = new URL(assetPath, window.location.origin).pathname;
+  const markerIndex = pathname.indexOf(marker);
+
+  if (markerIndex < 0) {
+    return null;
+  }
+
+  return pathname.slice(0, markerIndex) || '/';
+}
 
 function normalizeBase(path: string) {
   const trimmed = path.trim();

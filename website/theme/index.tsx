@@ -37,7 +37,7 @@ function warmRoutes(currentPath: string) {
   if (
     didWarmRoutes ||
     typeof window === 'undefined' ||
-    process.env.NODE_ENV !== 'production'
+    !isProductionRuntime()
   ) {
     return;
   }
@@ -52,6 +52,10 @@ function warmRoutes(currentPath: string) {
 
     preloadLink(route);
   }
+}
+
+function isProductionRuntime() {
+  return typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
 }
 
 function HomeLanguageRedirect() {
